@@ -1,0 +1,59 @@
+\section{Introduction}
+\label{sec:introduction}
+
+\begin{table}[t]
+  \centering
+  \scriptsize
+  \caption{Software stack readiness of representative open-source tensor/DNN accelerators.
+  \CIRCLE{} = available, \LEFTcircle{} = partial/limited, \Circle{} = unavailable.
+  \textbf{TensorLift} targets accelerators with open RTL (\CIRCLE{}/\LEFTcircle{} in col.~3)
+  but missing ISA specifications (\Circle{} in col.~1).}
+  \label{tab:accel-landscape}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}lcccc@{}}
+    \toprule
+    Accelerator
+      & \makecell{ISA\\Spec}
+      & \makecell{Compiler\\Backend}
+      & \makecell{Open\\RTL}
+      & \makecell{Test\\Oracle} \\
+    \midrule
+    % --- No compiler backend ---
+    MAERI~\cite{maeri-asplos2018}
+      & \Circle      & \Circle      & \CIRCLE      & \Circle \\
+    SIGMA~\cite{sigma-hpca2020}
+      & \Circle      & \Circle      & \CIRCLE      & \Circle \\
+    Eyeriss~\cite{eyeriss-jssc2017}
+      & \Circle      & \Circle      & \LEFTcircle  & \Circle \\
+    MAGNet~\cite{venkatesan2019magnet}
+      & \Circle      & \Circle      & \CIRCLE      & \Circle \\
+    DNNBuilder~\cite{dnnbuilder-iccad2018}
+      & \Circle      & \Circle      & \CIRCLE      & \Circle \\
+    FlexASR~\cite{flexasr}
+      & \Circle      & \Circle      & \CIRCLE      & \Circle \\
+    SPAGHETTI~\cite{spaghetti}
+      & \Circle      & \Circle      & \CIRCLE      & \Circle \\
+    \midrule
+    % --- Partial compiler support ---
+    NVDLA~\cite{nvdla}
+      & \LEFTcircle  & \LEFTcircle  & \CIRCLE      & \LEFTcircle \\
+    Gemmini~\cite{gemmini-dac2021}
+      & \LEFTcircle  & \LEFTcircle  & \CIRCLE      & \LEFTcircle \\
+    VTA~\cite{vta}
+      & \LEFTcircle  & \LEFTcircle  & \CIRCLE      & \LEFTcircle \\
+    DnnWeaver~\cite{dnnweaver-micro2016}
+      & \Circle      & \LEFTcircle  & \CIRCLE      & \Circle \\
+    \midrule
+    % --- Mature (baselines) ---
+    Google TPU~\cite{tpuv1}
+      & \CIRCLE      & \CIRCLE      & \Circle      & \CIRCLE \\
+    Intel AMX~\cite{amx}
+      & \CIRCLE      & \CIRCLE      & \Circle      & \CIRCLE \\
+    \bottomrule
+  \end{tabular*}
+\end{table}
+
+
+% TODO: Write introduction
+\lipsum[1]
+

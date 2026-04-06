@@ -1,0 +1,97 @@
+%%
+%% Commands for TeXCount
+%TC:macro \cite [option:text,text]
+%TC:macro \citep [option:text,text]
+%TC:macro \citet [option:text,text]
+%TC:envir table 0 1
+%TC:envir table* 0 1
+%TC:envir tabular [ignore] word
+%TC:envir displaymath 0 word
+%TC:envir math 0 word
+%TC:envir comment 0 0
+%%
+%% For submission and review of your manuscript please change the
+%% command to \documentclass[manuscript, screen, review]{acmart}.
+%%
+%% When submitting camera ready or to TAPS, please change the command
+%% to \documentclass[sigconf]{acmart}.
+%%
+\documentclass[sigconf,authordraft, anonymous]{acmart}
+
+\AtBeginDocument{%
+  \providecommand\BibTeX{{Bib\TeX}}}
+
+%% Rights management information.
+%% Update these with your actual rights form values.
+\setcopyright{acmlicensed}
+\copyrightyear{2026}
+\acmYear{2026}
+\acmDOI{XXXXXXX.XXXXXXX}
+\acmConference[ICCAD '26]{International Conference on Computer-Aided Design}{November 8--12, 2026}{San Jose, California, USA}
+\acmISBN{978-1-4503-XXXX-X/2025/00}
+
+
+\usepackage{lipsum}
+\usepackage{wasysym} 
+\usepackage{booktabs}
+\usepackage{makecell}
+
+%%
+%% Author information
+%%
+\begin{document}
+
+\title{TensorLift: Automatic Extraction of Tensor-Level ISA Semantics from Accelerator RTL via MLIR Semantic Lifting}
+
+\author{Ruijie Gao}
+\email{ruijieg@umich.edu}
+\affiliation{%
+  \institution{University of Michigan}
+  \city{Ann Arbor}
+  \state{Michigan}
+  \country{United State of America}
+}
+
+\renewcommand{\shortauthors}{Gao et al.}
+
+\begin{abstract}
+
+Numerous tensor accelerator designs exist in academia and industry, yet most lack well-documented ISAs and the software tooling needed to use them, leaving fabricated silicon underutilized. Recent work (e.g., TAIDL and the ACT ecosystem) has shown that given a tensor-level ISA specification, complete software stacks including test oracles and compiler backends can be automatically generated. However, writing such specifications remains a manual, expert-driven process.
+
+We present TensorLift, a fully automated framework that extracts tensor-level ISA specifications directly from accelerator RTL. Building on prior architecture-level model extraction that produces bit-level LLVM IR, TensorLift introduces an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure, including MAC idioms, saturation semantics, multi-dimensional buffer organizations, and data layout transformations. The pipeline emits specifications in the TAIDL formalism, immediately enabling automatic software stack generation through the ACT ecosystem.
+
+We evaluate TensorLift on Gemmini, a systolic-array accelerator, extracting all 11 hardware instructions with a 97.5\% MLIR reduction. TensorLift discovers hardware features omitted from the hand-written reference, including pooling engine semantics and im2col hardware support. Correctness is validated through SMT equivalence proofs and simulator testing. TensorLift closes the loop from RTL to full software stack without manual ISA documentation.
+\end{abstract}
+
+% \begin{CCSXML}
+% <ccs2012>
+%  <concept>
+%   <concept_id>00000000.0000000.0000000</concept_id>
+%   <concept_desc>Replace with correct CCS terms</concept_desc>
+%   <concept_significance>500</concept_significance>
+%  </concept>
+% </ccs2012>
+% \end{CCSXML}
+
+% \ccsdesc[500]{Replace with correct CCS terms}
+
+\keywords{Tensor Accelerators, ISA Extraction, RTL Abstraction, MLIR, Semantic Lifting, Hardware-Software Interface}
+
+\maketitle
+
+
+\input{sections/introduction}
+\input{sections/background}
+\input{sections/pipeline}
+\input{sections/evaluation}
+\input{sections/related}
+\input{sections/conclusion}
+
+\begin{acks}
+% TODO: Add acknowledgments
+\end{acks}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}
