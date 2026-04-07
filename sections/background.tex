@@ -4,9 +4,29 @@
 % TODO: Write background
 
 
-\subsection{Instruction-Level Abstraction (ILA)}
+\subsection{Hardware-Software Interfaces in Tensor Accelerators}
+\label{subsec:hw-sw-interface}
+
+Tensor accelerators occupy a fundamentally different point in the design space than scalar or vector processors.
+Rather than executing fine-grained instruction streams over flat register files and cache-coherent memory, they expose \emph{coarse-grained} operations that consume and produce multi-dimensional tensors and replace implicit caches with \emph{explicitly managed} on-chip memories (scratchpads, accumulator banks).
+Gemmini~\cite{gemmini-dac2021}, Berkeley's open-source systolic-array generator, is representative: it attaches to a Rocket core as a RoCC accelerator~\cite{chipyard} with non-standard RISC-V custom instructions, and its programmer-visible state consists of a row-addressed scratchpad and an accumulator.
+Its ISA exposes only configuration, DMA data-movement, and matrix-multiply execution instructions---every operation simultaneously specifies \emph{what} to compute, \emph{where} operands live in a private memory hierarchy, and \emph{how} data should be staged.
+
+This distinctiveness places heavy demands on compiler infrastructure.
+ML frameworks feed tensor IR (StableHLO, Linalg, TOSA) into backends such as XLA~\cite{xla}, TVM~\cite{tvm}, or IREE~\cite{iree}, which must lower high-level operations to the accelerator's native instructions.
+Doing so correctly requires tiling and fusing loop nests to fit scratchpad capacity, scheduling explicit DMA transfers, allocating scratchpad regions, and orchestrating double-buffering---all of which presuppose a precise model of what each instruction does to which piece of tensor state.
+
+Consider lowering a single XLA \texttt{dot} $C{=}A{\cdot}B$ for matrices exceeding Gemmini's $16{\times}16$ tile.
+The backend must emit a tiled sequence: \texttt{config\_ex}/\texttt{config\_ld}/\texttt{config\_st} to set dataflow and stride parameters; \texttt{mvin}/\texttt{mvin2} to stage tiles of $A$ and $B$ into the scratchpad; \texttt{preload} followed by \texttt{compute\_preloaded} (or \texttt{compute\_accumulated}) to fire the systolic array for each output tile; and \texttt{mvout} to drain results.
+Generating this sequence requires the backend to know, for every instruction, which tensor tile it touches, which scratchpad region it occupies, and how its output composes with subsequent operations.
+
+This is precisely where most accelerators fall short.
+Mapping tensor IR to an instruction sequence presupposes a \emph{machine-readable} ISA that specifies both the binary encoding and the \emph{tensor-level semantics} of each instruction.
+For Gemmini, semantics live informally in prose documentation, the Chisel RTL, and a hand-written Spike functional model; most open-source accelerators offer only RTL and perhaps a driver.
+Building a backend today is therefore largely an exercise in \emph{manual reverse-engineering of the RTL}---a human infers what each custom instruction means at the tensor level and re-encodes that knowledge by hand.
+This is the bottleneck that motivates automatically lifting tensor-level ISA semantics directly from RTL.
+
+\subsection{Automated Compiler Generation and the Specification Bottleneck}
 
 
-
-
-\subsection{ACT Ecosystem and TAIDL}
+\subsection{RTL Extraction and MLIR-Based Semantic Lifting}
