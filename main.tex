@@ -30,7 +30,12 @@
 \acmConference[ICCAD '26]{International Conference on Computer-Aided Design}{November 8--12, 2026}{San Jose, California, USA}
 \acmISBN{978-1-4503-XXXX-X/2025/00}
 
+%% Remove the copyright statement and ACM reference block from the PDF
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
 
+\raggedbottom
 \usepackage{lipsum}
 \usepackage{wasysym} 
 \usepackage{booktabs}
@@ -91,6 +96,8 @@ We evaluate TensorLift on Gemmini, a systolic-array accelerator, extracting all 
 \begin{acks}
 % TODO: Add acknowledgments
 \end{acks}
+
+\clearpage
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}

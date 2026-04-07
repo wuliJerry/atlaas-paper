@@ -16,6 +16,7 @@
 *.bcf
 *.run.xml
 *.dvi
+*xcp
 
 # Generated PDF (keep source, not output)
 main.pdf
