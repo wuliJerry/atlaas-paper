@@ -27,6 +27,43 @@ Building a backend today is therefore largely an exercise in \emph{manual revers
 This is the bottleneck that motivates automatically lifting tensor-level ISA semantics directly from RTL.
 
 \subsection{Automated Compiler Generation and the Specification Bottleneck}
+\label{subsec:spec-bottleneck}
 
+Recent work has shown that the main barrier to end-to-end software support for tensor accelerators is not only backend engineering effort, but the lack of a precise, machine-readable Instruction Set Architecture (ISA) specification. TAIDL~\cite{taidl-micro2025} (Tensor Accelerator ISA Definition Language) addresses this problem by providing a domain-specific language for describing accelerator data models and instruction semantics at the tensor level. A key design choice in TAIDL is that instruction behavior is expressed using tensor operators close to XLA High Level Optimizer (XLA-HLO)~\cite{xla}, such as \texttt{reshape}, \texttt{transpose}, \texttt{convert}, \texttt{dot}, and \texttt{add}. This abstraction level is high enough to capture programmer-visible tensor semantics compactly, while remaining close enough to tensor compiler intermediate representations to support downstream automation.
+
+A representative TAIDL specification therefore looks less like microarchitectural pseudocode and more like a tensor transformation. For example, a simplified multiply-accumulate style instruction can be expressed as follows:
+
+\begin{figure}[h]
+\begin{lstlisting}[style=taidl, caption={Simplified TAIDL specification for a Gemmini multiply-accumulate instruction (adapted from~\cite{taidl-ae-micro2025}). The real specification additionally includes dataflow-dependent operand routing (\texttt{IF/@s.dataflow}) and state constraint/update logic; here we show only the core tensor semantics: type promotion\, contraction\, accumulation\, saturation clamp\, and write-back.}, label={lst:taidl-example}]
+# Data model: scratchpad and accumulator
+acc.add_data_model("sp", "1024*DIM", f"{DIM}xs8")
+acc.add_data_model("bias", f"{DIM}", f"{DIM}xs32")
+
+# Instruction with register operands
+instr = acc.add_instruction("matmul8_compute",
+            ["rs1", "rs2"])
+instr.add_semantics(f"""
+  %A.8:  {DIM}x{DIM}xs8  <- sp[@a.rs1:..., 0:{DIM}];
+  %B.8:  {DIM}x{DIM}xs8  <- sp[@a.rs2:..., 0:{DIM}];
+  %D.8:  {DIM}x{DIM}xs8  <- sp[@s.rs1:..., 0:{DIM}];
+  %A.32: {DIM}x{DIM}xs32 = convert(%A.8);
+  %B.32: {DIM}x{DIM}xs32 = convert(%B.8);
+  %D.32: {DIM}x{DIM}xs32 = convert(%D.8);
+  %dot:  {DIM}x{DIM}xs32 = dot(%A.32, %B.32),
+         lhs_contracting_dims={{1}},
+         rhs_contracting_dims={{0}};
+  %C.32: {DIM}x{DIM}xs32 = add(%dot, %D.32);
+  %C.cl: {DIM}x{DIM}xs32 = clamp(-128, %C.32, 127);
+  %C.8:  {DIM}x{DIM}xs8  = convert(%C.cl);
+  %C.8 -> sp[@s.rs2, 0];
+""")
+\end{lstlisting}
+\end{figure}
+
+\noindent This example illustrates the semantic granularity expected by TAIDL: the author must specify the tensor buffers exposed by the accelerator, the instruction operands, and the exact tensor-level effect of the instruction, but not the underlying Register-Transfer Level (RTL) control or datapath implementation. In published TAIDL examples, even more complex instructions such as Intel Advanced Matrix Extensions (Intel AMX)~\cite{amx} \texttt{tdpbusd} are modeled by composing layout transformations (\texttt{reshape}, \texttt{transpose}), type conversion, tensor contraction, accumulation, and write-back in the same style.
+
+Built on top of such specifications, ACT~\cite{act-arxiv} (Accelerator Compiler Toolkit) automates what comes after the ISA description. Given a TAIDL specification, ACT automatically generates compiler backends by combining equality saturation for instruction selection with constraint-programming-based memory allocation. The result is an ISA-driven compilation flow in which much of the backend logic is synthesized rather than handwritten. This is particularly attractive for tensor accelerators, whose instructions often operate on parameterized tensor tiles and explicitly managed on-chip memories that are difficult to support using conventional backend-generation techniques.
+
+However, the automation boundary in this pipeline is also its key limitation. TAIDL and ACT automate essentially everything downstream of the ISA specification, but they do not automate the creation of that specification itself. Someone must still write the TAIDL model by hand, including the accelerator's tensor buffers, control state, instruction parameters, constraints, and tensor-level semantics. This remains a manual, expert-driven task that requires deep knowledge of the hardware/software interface. For well-documented accelerators, this process is already labor-intensive; for undocumented or rapidly evolving research accelerators, it becomes the dominant bottleneck preventing end-to-end evaluation. Thus, although ISA-driven automation substantially reduces compiler construction effort, it does not eliminate the front-end specification burden. This manual specification bottleneck directly motivates methods that can recover TAIDL-level semantics automatically from RTL, thereby closing the remaining gap between hardware designs and fully automated software-stack generation.
 
 \subsection{RTL Extraction and MLIR-Based Semantic Lifting}

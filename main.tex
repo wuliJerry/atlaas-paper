@@ -42,6 +42,43 @@
 \usepackage{makecell}
 \usepackage{svg}
 \usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{codebg}{HTML}{F5F5F5}
+\definecolor{codeframe}{HTML}{CCCCCC}
+\definecolor{keyword}{HTML}{0060A8}
+\definecolor{string}{HTML}{A31515}
+\definecolor{comment}{HTML}{6A737D}
+
+\lstdefinestyle{taidl}{
+  language=Python,
+  basicstyle=\ttfamily\scriptsize,
+  keywordstyle=\color{keyword}\bfseries,
+  stringstyle=\color{string},
+  commentstyle=\color{comment}\itshape,
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  framesep=4pt,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+  aboveskip=6pt,
+  belowskip=6pt,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  tabsize=2,
+  morekeywords={add_data_model, add_instruction, add_semantics,
+                convert, dot, reshape, transpose},
+  literate=
+    {<-}{{$\leftarrow$}}2
+    {->}{{$\rightarrow$}}2
+    {\%A}{{{\color{keyword}\%A}}}2
+    {\%B}{{{\color{keyword}\%B}}}2
+    {\%C}{{{\color{keyword}\%C}}}2,
+  captionpos=b,
+}
 
 
 %%
