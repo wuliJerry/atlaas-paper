@@ -1,64 +1,39 @@
 \section{TensorLift Pipeline}
 \label{sec:pipeline}
 
-Figure~\ref{fig:overview} (lower half) decomposes TensorLift into three sequential stages that, taken together, transform an unannotated RTL design into a TAIDL specification consumable by the ACT ecosystem.
-\textbf{Stage~1 (RTL-to-MLIR extraction, \S\ref{subsec:stage1})} uses an extended autoGenILA backend to symbolically unroll the design and emit, for every (instruction, ASV) pair, a low-level MLIR function written in the \texttt{arith}, \texttt{memref}, \texttt{scf}, and \texttt{affine} dialects.
-\textbf{Stage~2 (semantic lifting, \S\ref{subsec:stage2})} runs an eight-pass MLIR rewrite pipeline that progressively normalizes bit-manipulation idioms, recovers multiply--accumulate and saturation structure, specializes control modes, reconstructs MAC chains as \texttt{scf.for} reductions, and lifts dot-product loops into the \texttt{linalg} dialect; a final metadata-emission pass annotates the lifted MLIR with structured \texttt{taidl.*} attributes.
-\textbf{Stage~3 (TAIDL assembly, \S\ref{subsec:stage3})} consumes those annotations through a generic Python emitter that materializes a TAIDL specification with XLA-HLO-style semantics, together with the data-model declarations and instruction encodings.
-The boundaries between stages are deliberately deep: Stage~1 owns all hardware-level reasoning and produces a behavior-equivalent yet still-bit-level model; Stage~2 owns all rewriting from bit-level to tensor-level semantics and is purely an MLIR pass pipeline; Stage~3 is a syntactic projection into the surface TAIDL language.
-The remainder of this section walks through each stage in turn.
+TensorLift transforms an unannotated RTL design into a TAIDL specification through three stages (Figure~\ref{fig:overview}):
+\textbf{Stage~1 (\S\ref{subsec:stage1})} symbolically extracts per-instruction behavior from the RTL into bit-level MLIR;
+\textbf{Stage~2 (\S\ref{subsec:stage2})} progressively lifts that bit-level representation to tensor-level semantics via an eight-pass rewrite pipeline;
+\textbf{Stage~3 (\S\ref{subsec:stage3})} assembles the lifted MLIR into a TAIDL specification with XLA-HLO-style semantics.
+The entire pipeline takes a directory of SystemVerilog files and a top-module name as input, and produces a complete TAIDL specification consumable by the ACT ecosystem.
 
 \subsection{Stage 1: RTL-to-MLIR Extraction}
 \label{subsec:stage1}
 
-TensorLift's first stage builds on autoGenILA~\cite{autogenilaiccad,autogeniladate}, a two-pass framework for recovering instruction-level behavior from synthesizable RTL.
-Given a flattened Verilog design and a small per-instruction harness file that pins control inputs to a particular opcode while leaving data inputs symbolic, autoGenILA first uses path-sensitive taint analysis~\cite{autogenilaiccad} to identify the subset of registers that are \emph{architectural state variables} (ASVs)---registers whose values persist across instruction boundaries and form the programmer-visible state.
-It then processes one (instruction, ASV) pair at a time~\cite{autogeniladate}: it symbolically unrolls the design over a user-supplied cycle bound, walks the resulting AST and constraint DAG with handlers for arithmetic, comparison, ITE/case mux, bit-select, concatenation, and submodule-call constructs, and emits an LLVM IR function whose arguments are the instruction inputs and current ASV values, and whose return value is the next-state value of the chosen ASV.
-Together, the two passes yield a per-instruction architectural model that is bit-equivalent to the RTL by construction, no longer dependent on simulator infrastructure, and amenable to formal reasoning.
+Stage~1 builds on autoGenILA~\cite{autogenilaiccad,autogeniladate}, which symbolically unrolls a Verilog design for each (instruction, architectural state variable) pair, producing a function that maps current state and inputs to next state---provably bit-equivalent to the RTL by construction.
+However, autoGenILA's LLVM IR backend destroys two structural properties that tensor-level reasoning requires.
+First, conditional updates are lowered into branches and \texttt{phi} nodes, erasing the if/else structure that encodes hardware mode selection.
+Second, RTL signal names---which identify whether an input carries activations, weights, or an accumulator---are discarded during lowering.
 
-Although autoGenILA is the right starting point---it solves the \emph{extraction} problem with provable bit-equivalence---its output is unsuitable for tensor-level reasoning in two ways.
-First, the LLVM IR backend is structurally tuned for compiled execution: it lowers conditional updates into branches and \texttt{phi} nodes, replaces typed memory accesses with pointer arithmetic, and---most consequentially---discards the RTL signal-name provenance that downstream lifting passes need to recognize buffers semantically (``which scalar argument carries the activation tile, and which carries the accumulator?'').
-Second, autoGenILA was designed and evaluated on scalar RISC-V cores, and several construct families that arise routinely in DNN accelerators---signed division and modulo for DMA address arithmetic, and update functions whose intermediate constraint width does not match the declared return width---either trip the constraint dispatcher or produce verifier-rejected IR.
-Both shortcomings have to be repaired before semantic lifting can proceed.
+TensorLift replaces the LLVM IR backend with an MLIR code generator that preserves both.
+Conditional updates become \texttt{scf.if} regions; memory accesses remain as indexed \texttt{memref} loads; and original RTL signal names are attached as structured metadata that downstream passes consult to classify arguments semantically.
+A second design choice packs the time series of each input signal across unroll cycles into a single \texttt{memref} argument rather than flattening them into hundreds of independent scalars---this grouping is what later enables loop reconstruction (\S\ref{subsec:stage2}) to recover MAC chains as indexable reductions.
+An automation layer generates flattening scripts, enumerates architectural state variables, and discovers instruction encodings from the RTL decoder, reducing the per-design manual input to two items.
+The original LLVM IR backend is retained unchanged as a verification oracle (\S\ref{sec:evaluation}).
 
-\paragraph{TensorLift's modifications.}
-We retain autoGenILA's taint-based ASV inference, symbolic unrolling, and constraint-DAG traversal entirely; the modifications consist of a new code generator that replaces the LLVM IR backend, plus a small automation layer wrapped around the extraction. The original LLVM IR backend remains available unchanged and is reused as a verification oracle (\S\ref{sec:evaluation}). Concretely, the changes are:
-
-\begin{enumerate}
-\item \textbf{An MLIR-producing update-function backend.}
-We add an alternative backend, \texttt{MLIRUpdateFunctionGen}, that mirrors autoGenILA's existing constraint-handler dispatch---two-operand and one-operand arithmetic, ITE/case/switch mux, bit-select and concatenation, dynamic memory selection, and submodule-call constructs---but emits MLIR in the \texttt{arith}, \texttt{memref}, \texttt{scf}, and \texttt{affine} dialects rather than LLVM IR.
-The choice of MLIR is not cosmetic: the \texttt{scf} dialect preserves \texttt{if}/\texttt{else} regions instead of branching, \texttt{memref} preserves indexed loads and stores instead of pointer arithmetic, and the dialect-aware rewrite framework~\cite{mlir-cgo2021,mlir-pattern-rewriting} underpins every pass in Stage~2 (\S\ref{subsec:stage2}).
-The backend is selected by a single CLI flag, shares all of autoGenILA's parsing, taint, and traversal infrastructure unchanged, and every emitted file is round-tripped through \texttt{mlir-opt} as a sanity check before lifting.
-
-\item \textbf{Time-indexed input memrefs.}
-The natural translation of autoGenILA's input model would lower each module input signal at each unroll cycle as an independent scalar argument, so a 36-cycle unroll of a controller with eleven inputs would produce nearly four hundred unrelated scalars.
-Our backend instead packs the time series of each input into a single \texttt{memref}-typed argument whose leading dimension is the unroll bound and whose element type is the original signal width, with one explicit \texttt{memref.load} per cycle inside the function body.
-This grouping carries no semantic content of its own, but it is what later allows the loop-reconstruction pass to recognize MAC chains as indexable reductions and lift them into \texttt{scf.for} loops (\S\ref{subsec:stage2}); without the grouping, the same chain decomposes into hundreds of unrelated scalars and is unrecoverable.
-
-\item \textbf{RTL signal-name provenance via the \texttt{taidl.arg\_names} attribute.}
-For each emitted \texttt{func.func}, the backend attaches the ordered list of original RTL signal names (\texttt{io\_in\_a\_0}, \texttt{io\_srams\_read\_0\_resp\_bits\_data}, $\ldots$) as an \texttt{ArrayAttr} on the function operation.
-The lifting passes downstream consult this attribute to classify arguments as data buffers, control attributes, or accumulator state, and the TAIDL assembler in Stage~3 uses the same attribute to derive instruction-operand names matching the convention used by hand-written TAIDL specifications~\cite{taidl-ae-micro2025}.
-Without this hook, every shred of semantic information about RTL signals would be lost the moment the constraint DAG is lowered into anonymous MLIR \texttt{Value}s.
-
-\item \textbf{Robustness fixes for accelerator construct families.}
-Two construct families absent from autoGenILA's published evaluation but ubiquitous in DNN accelerators required completing the dispatcher.
-The first is signed and unsigned division and modulo, which appear in the DMA stride and pixel-repeat address arithmetic of Gemmini's load and store controllers; we add the corresponding \texttt{arith.divsi}/\texttt{remsi} (and unsigned-variant) cases to the constraint handler.
-The second is constraint expressions whose inferred intermediate width exceeds the declared return width of an update function---a common situation when a width-conservative \texttt{i32} traversal ultimately writes a one-bit predicate register; we insert an explicit \texttt{trunci}/\texttt{extui} adapter at the function return so the emitted MLIR satisfies the verifier under all combinations of intermediate and declared widths.
-
-\item \textbf{An automation harness around the extraction.}
-Vanilla autoGenILA expects the user to hand-author four ancillary files per design---a Yosys flatten script, a reset script, a per-instruction harness (\texttt{instr.txt}), and an ASV target list (\texttt{allowed\_target.txt})---together with knowledge of clock and reset signal names, pipeline depths, and per-opcode control vectors.
-We replace this with a small set of generators that, given only a directory of SystemVerilog files and a top-module name, automatically (a)~run Yosys with FIRRTL-aware assertion stripping (\texttt{chformal -remove}, required because Chisel \texttt{assert} calls survive into the synthesized netlist) and post-process its output to satisfy autoGenILA's parser, (b)~enumerate ASV targets by walking flip-flop declarations and grouping vector slices, and (c)~discover instruction encodings from the RTL decoder for funct-field ISAs.
-The harness reduces the per-design manual input to two items, an RTL directory and a top-module name, which is what makes the end-to-end pipeline of Figure~\ref{fig:overview} viable in practice.
-\end{enumerate}
-
-The result of Stage~1 is a corpus of MLIR files, one per (instruction, ASV) pair, each containing a single \texttt{func.func} carrying the \texttt{taidl.arg\_names} attribute, written entirely in the \texttt{arith}, \texttt{memref}, \texttt{scf}, and \texttt{affine} dialects, and provably equivalent (modulo the LLVM IR equivalence proofs of \S\ref{sec:evaluation}) to autoGenILA's bit-accurate model of the RTL.
-As Figure~\ref{fig:code} (middle panel) illustrates, even a single Gemmini PE produces 686 lines of MLIR at this stage---an artifact of the bit-level structure of autoGenILA's traversal, in which the core multiply--accumulate is buried under 383 sign-extension and bit-packing operations.
-Recovering tensor-level structure from this representation is the job of Stage~2.
+The output is a corpus of MLIR files, one per (instruction, ASV) pair, provably bit-equivalent to the RTL.
+As Figure~\ref{fig:code} illustrates, even a single Gemmini PE produces 686 lines at this stage, with the core multiply--accumulate buried under hundreds of sign-extension and bit-packing operations.
 
 \subsection{Stage 2: Semantic Lifting}
 \label{subsec:stage2}
 
-Stage~2 is the analytical core of TensorLift: an eight-pass MLIR pipeline, registered behind a single \texttt{tensorlift-opt} tool, that turns the bit-accurate Stage~1 output into MLIR whose structure mirrors tensor-level semantics. The passes fall into four phases (2\,+\,3\,+\,2\,+\,1 passes respectively): (\textbf{A}) bit-manipulation canonicalization, (\textbf{B}) idiom detection for MAC, control-mode, and saturation patterns, (\textbf{C}) loop and tensor-shape reconstruction, and (\textbf{D}) TAIDL metadata emission. Table~\ref{tab:lifting-passes} lists the eight passes; the remainder of this subsection highlights the design choices that distinguish the pipeline from a conventional MLIR lowering.
+Stage~2 is the analytical core of TensorLift: an eight-pass MLIR pipeline that progressively recovers tensor-level semantics from the bit-level Stage~1 output.
+The passes fall into four phases (Table~\ref{tab:lifting-passes}).
+
+\textbf{Phase~A (canonicalization)} collapses the bit-by-bit sign-extension chains that arise from Verilog \texttt{\$signed} contexts into single cast operations, and folds redundant width round-trips---the dominant source of code reduction.
+\textbf{Phase~B (idiom detection)} identifies three patterns: multiply--accumulate, by tracing each addition back through width casts to a multiplier; dead hardware modes, by constant-folding the fixed control inputs of the instruction under analysis; and fixed-point saturation, by recognizing the \texttt{ext(trunci(x))} idiom.
+\textbf{Phase~C (loop reconstruction)} chains MAC-annotated operations whose accumulator output feeds the next MAC's input into \texttt{scf.for} reductions, then verifies that each loop matches the canonical dot-product shape (single iterator, two memref loads at the induction variable, multiply--add--yield) and tags it accordingly.
+\textbf{Phase~D (metadata emission)} classifies each \texttt{memref} argument by its access pattern, labels scalar arguments as control attributes, and emits structured \texttt{taidl.*} attributes consumed by Stage~3.
 
 \begin{table}[t]
 \centering
@@ -94,45 +69,21 @@ D8 \texttt{emit-taidl-metadata}
 \end{tabular}
 \end{table}
 
-\paragraph{Annotation-driven, accelerator-agnostic.}
-With the sole exception of loop reconstruction (C6), Phases~B--D do not rewrite the IR but instead attach \texttt{tensorlift.*} attributes to existing operations; the next pass keys off those attributes.
-This decoupling lets each pass be verified independently against MLIR's verifier and against the LLVM IR oracle (\S\ref{sec:evaluation}), and lets unrecognized dataflow degrade gracefully: an instruction whose body fails to match the MAC or clamp template simply does not receive the corresponding annotation, and the Stage~3 assembler falls back to an opaque \texttt{copy} or \texttt{unknown} semantics rather than producing incorrect TAIDL.
-None of the eight passes contains any Gemmini- or VTA-specific identifier: the structural cues they rely on (sign-extension chains, MAC fan-in, fixed-point clamp idioms, accumulator def-use chains, dot-product loop shape, and RTL signal-name suffixes such as \texttt{pool\_*} or \texttt{im2col\_*}) are properties of common synthesizable RTL patterns rather than of any particular ISA.
-The only per-instruction input is the control vector consumed by Pass~B4, which is itself derived automatically (\S\ref{subsec:stage1}); the same \texttt{tensorlift-opt} binary lifts Gemmini's PE, its DMA controllers, and VTA's TensorGemm and TensorAlu without modification.
+Two properties make the pipeline robust.
+First, with the exception of loop reconstruction, passes \emph{annotate} rather than rewrite: they attach attributes to existing operations, and downstream passes key off those attributes.
+An instruction that fails to match a template simply receives no annotation, and Stage~3 falls back to opaque semantics rather than producing incorrect TAIDL.
+Second, the pipeline is accelerator-agnostic: the structural cues it relies on---sign-extension chains, MAC fan-in, fixed-point clamp idioms, accumulator def--use chains---are properties of common RTL synthesis patterns, not of any particular ISA.
+The same binary lifts Gemmini's PE and DMA controllers, and VTA's TensorGemm and TensorAlu without modification.
 
-On the running example, the eight passes together reduce the Gemmini PE update function from 686 lines of bit-level MLIR to 49 lines, of which only 17 encode the actual computation core \texttt{clamp(dot(\%A,\%B)+\%C)}; the remaining lines are arguments, loads, stores, and the \texttt{taidl.*} metadata that Stage~3 turns into a TAIDL specification (\S\ref{sec:evaluation}).
+On the running Gemmini PE example, the eight passes reduce 686 lines of bit-level MLIR to 49, of which only 17 encode the computation core \texttt{clamp(dot(\%A,\%B)+\%C)}.
 
 \subsection{Stage 3: TAIDL Assembly}
 \label{subsec:stage3}
 
-Stage~3 is a Python emitter that turns the artifacts of Stage~2 into a complete TAIDL specification of the form shown in Listing~\ref{lst:taidl-example}.
-It consumes two parallel inputs: the \texttt{taidl.*}-annotated MLIR produced by Pass~D8, and auxiliary RTL analysis that recovers per-instruction state updates and, for CISC-style loop macros, the primitive instruction vocabulary and loop-bound configuration registers.
+Stage~3 assembles the annotated MLIR from Stage~2 into a complete TAIDL specification (Listing~\ref{lst:taidl-example}).
+It first merges the per-(instruction, ASV) functions back into per-instruction groups, then dispatches on the recognized tensor operation through two paths.
+The \emph{compute path} maps each tensor op to an XLA-HLO template: \texttt{dot\_product} expands to \texttt{convert\,+\,dot\,+\,add} (with optional \texttt{clamp}), \texttt{pool} to \texttt{reduce(max)}, and \texttt{im2col\_matmul} to \texttt{reshape\,+\,dot\,+\,add}; when the RTL encodes an activation function, the corresponding HLO operation is inserted (e.g., \texttt{maximum(result,\,0)} for ReLU).
+The \emph{DMA path} classifies memory-port roles (DRAM address vs.\ scratchpad address) from the annotated metadata and emits a \texttt{load} or \texttt{store} body accordingly.
 
-\paragraph{Primitive instruction assembly.}
-The assembler operates on a closed vocabulary of thirteen \texttt{taidl.*} attribute keys.
-After parsing each annotated function into a Python record, it merges the per-(instruction, ASV) functions emitted by Stage~1 back into per-instruction groups using the instruction names from the same descriptor that drove Stage~1, falling back to a longest-prefix heuristic when no descriptor is available---so the same code path handles Gemmini's four-instruction \texttt{ExecuteController} and VTA's single-instruction modules without modification.
-Within each group the assembler selects the metadata record with the richest dataflow as a template and dispatches its \texttt{tensor\_op} through two parallel paths.
-The \emph{compute path} maps each tensor op to its XLA-HLO template: \texttt{mac}/\texttt{dot\_product} expand to \texttt{convert + dot + add} (with optional \texttt{clamp}), \texttt{pool} to \texttt{reduce(max)}, and \texttt{im2col\_matmul} to \texttt{reshape + dot + add}.
-The \emph{DMA path} is driven by \texttt{taidl.dma\_role} tags attached to target-ASV functions whose ports belong to a DMA request bundle (e.g., \texttt{io\_dma\_req\_bits\_vaddr} $\to$ \texttt{dma\_dram\_addr}, \texttt{io\_dma\_req\_bits\_laddr\_data} $\to$ \texttt{dma\_spad\_addr}); the assembler collects the role set across the instruction group and emits a \texttt{load} or \texttt{store} body accordingly, distinguishing \texttt{mvin} from \texttt{mvout} without any per-instruction routing logic.
-Each emitted instruction body follows the v2 TAIDL IDL format consumed by ACT's ANTLR-based parser: operands enter as flat \texttt{u8} buffers that are reshaped and bitcast-converted to signed types, the core tensor operation is expressed using HLO-level primitives (\texttt{dot}, \texttt{add}, \texttt{reshape}, \texttt{reduce}, etc.), and the result is narrowed and bitcast back to \texttt{u8}---matching the canonical form that JAX emits for integer workloads and that ACT's pattern matcher expects.
-Instruction attributes (shapes, addresses, mode flags) are derived from the register-field roles supplied by the same instruction descriptor.
-
-\paragraph{CISC macro composition.}
-Real workloads on accelerators like Gemmini are typically dispatched not as individual \texttt{compute\_preloaded} calls but through CISC-style loop macros (\texttt{loop\_ws}, \texttt{loop\_conv\_ws}) that orchestrate a sequence of primitive instructions behind a single driver invocation.
-TensorLift handles these through two RTL-parsing helpers that are independent of the lifting pipeline: one statically parses the arbiter wiring in the loop controller's flattened Verilog to recover the set of primitive funct codes the macro can issue; the other extracts per-funct state-register writes from the controller's dispatch tables.
-The assembler composes the primitive vocabulary's tensor operation (e.g., the \texttt{dot\_product} from the compute sub-FSM) over the extracted loop bounds (from the config companions' state updates) into a whole-program HLO body.
-The matmul-vs-convolution distinction is currently resolved by a \texttt{macro\_type} tag in the instruction descriptor (one token per CISC macro); we note that it could alternatively be inferred from the dimensionality of the iteration space, since convolution loops carry spatial-dimension bounds that matrix-multiply loops do not.
-For instructions whose RTL encodes an activation field, the assembler emits a variant (e.g., \texttt{loop\_ws\_relu}) that inserts a \texttt{maximum(result, broadcast(0))} before the narrowing chain, with the activation-to-HLO mapping derived from the extracted register value.
-
-\paragraph{Inferring the instruction state machine.}
-The constraints and updates that gate primitive instructions---e.g., that \texttt{compute\_preloaded} can fire only after \texttt{preload} has armed the controller---are not visible in the Stage~2 output, which is per-instruction by construction.
-For primitive instructions whose extraction directories contain LLVM IR files, we recover constraints with a script that reads the per-ASV update functions in their LLVM IR form, where the \texttt{icmp eq} comparisons against control registers that Pass~A1 collapses are still intact.
-The script auto-detects the FSM register by scoring all multi-writer scalar ASVs against three predicates: small bit-width ($\leq\!8$), the presence of \texttt{icmp eq} comparisons at the register's own bit-width (which filters out boolean event flags), and at least two distinct compared constants.
-Once the FSM register is fixed, each instruction's constraint is the set of constants its update functions compare the register against, with pipeline-flush boundary values filtered as boilerplate; instructions that write the FSM but test no explicit value are handled by a binary-FSM complement rule.
-For the newer CISC loop directories (which contain only \texttt{.tmp.mlir} and no \texttt{.ll}), state updates are instead obtained by the RTL dispatch-table parser described above, which extracts per-funct register writes directly from the Verilog \texttt{always} blocks.
-In both cases the recovered state information is folded into the emitted TAIDL as structured metadata comments rather than runtime-callable API methods, consistent with the v2 TAIDL format.
-
-On the running Gemmini example, this Stage~3 reproduces the structure of the hand-written reference TAIDL specification: the four primitive ExecuteController instructions carry the same constraints and state-update relations as the reference, the DMA-role synthesis correctly distinguishes \texttt{mvin} from \texttt{mvout}, and the CISC composition produces whole-program \texttt{loop\_ws} and \texttt{loop\_conv\_ws} bodies that match the reference's semantics.
-The only difference is that the inferred FSM register retains its RTL name (\texttt{control\_state}) where the hand-written specification uses a TAIDL-level alias (\texttt{preload}).
-As we report in \S\ref{sec:evaluation}, the test oracles produced from TensorLift's specification are character-identical to those produced from the hand-written reference, because the oracle generator alpha-renames state registers consistently across both inputs.
-Together with Stages~1--2, the pipeline closes the loop from RTL to ACT-consumable TAIDL, replacing what is otherwise a hand-authoring step with a deterministic lifting and assembly process.
+For CISC-style loop macros that orchestrate sequences of primitive instructions behind a single invocation (e.g., Gemmini's \texttt{loop\_ws}), TensorLift recovers the primitive instruction vocabulary and loop-bound configuration registers from the controller's RTL, then composes the primitive tensor operation over the extracted bounds into a whole-program HLO body.
+Instruction ordering constraints---e.g., that \texttt{compute\_preloaded} may only fire after \texttt{preload}---are recovered by analyzing FSM register updates across instruction groups and folded into the specification as structured metadata.
