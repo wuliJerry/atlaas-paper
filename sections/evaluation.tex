@@ -196,4 +196,4 @@ The transformer benchmark shows the largest positive delta ($+$1.9\%), attributa
 On the large workloads that dominate real deployment---ResNet-50 (49 conv layers) and MobileNet (52 layers)---the cycle counts are nearly identical: $+$227 cycles out of 5{,}544{,}077 ($+$0.004\%) for ResNet-50 and $+$167 out of 3{,}408{,}414 ($+$0.005\%) for MobileNet.
 Deltas this small confirm that both sides execute byte-identical tiled convolution sequences; the residual difference is fixed per-call setup overhead.
 
-This result demonstrates that TensorLift, combined with ACT, enables a fully automated path from RTL to a functional, performance-competitive compiler backend---without writing any ISA documentation, compiler passes, or kernel libraries by hand.
+This result demonstrates that TensorLift, combined with ACT, enables a fully automated path from RTL to a functional, performance-competitive compiler backend.
