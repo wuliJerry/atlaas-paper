@@ -12,7 +12,7 @@ We evaluate TensorLift along four axes:
 
 We target two open-source tensor accelerators.
 \textbf{Gemmini}~\cite{gemmini-dac2021} is a systolic-array accelerator (16$\times$16, INT8 MAC) generated via the Chipyard~\cite{chipyard} SoC framework in the \texttt{GemminiRocketConfig} configuration.
-It attaches to a Rocket core as a RoCC coprocessor and exposes three hardware controllers (ExecuteController, LoadController, StoreController) with 11 hardware instructions across configuration, DMA data movement, and matrix execution.
+It attaches to a Rocket core~\cite{asanovic2016rocket} as a RoCC coprocessor~\cite{chipyard} and exposes three hardware controllers (ExecuteController, LoadController, StoreController) with 11 hardware instructions across configuration, DMA data movement, and matrix execution.
 \textbf{VTA}~\cite{vta} is TVM's Versatile Tensor Accelerator in the \texttt{DefaultDe10Config} configuration (16-element GEMM engine, ALU, INT8), with four datapath modules (TensorGemm, TensorAlu, Store, GenVMECmd).
 
 All formal verification uses Z3~\cite{z3} bitvector SMT solving.
@@ -115,7 +115,7 @@ All extracted instruction behaviors---GEMM tensor contraction, ALU element-wise 
 \label{subsec:completeness}
 
 TensorLift extracts TAIDL specifications for \textbf{30 of 31} instructions listed in Gemmini's documentation.
-The single omitted entry, \texttt{fence}, is a host RISC-V instruction (not a RoCC accelerator instruction)---it is included in the Gemmini documentation only for completeness of the programming interface.
+The single omitted entry, \texttt{fence}, is a host RISC-V instruction (not a RoCC accelerator instruction~\cite{asanovic2016rocket})---it is included in the Gemmini documentation only for completeness of the programming interface.
 TensorLift correctly identifies this boundary: it extracts only instructions that are decoded and executed by Gemmini's hardware controllers.
 
 \paragraph{Comparison with hand-written reference.}
@@ -165,17 +165,17 @@ TensorLift's specification provides this macro-level abstraction (Stage~3, \S\re
 \label{tab:latency}
 \setlength{\tabcolsep}{3pt}
 \scriptsize
-\begin{tabular}{@{}l r r r r@{}}
+\begin{tabular}{@{}l r r r@{}}
 \toprule
-Benchmark & Layers & Hand-written & TensorLift+ACT & Delta \\
+Benchmark & Hand-written & TensorLift+ACT & Delta \\
 \midrule
-mlp3               &  2 &       1{,}501 &       1{,}433 & $-$4.5\% \\
-mlp2               &  2 &       2{,}571 &       2{,}451 & $-$4.7\% \\
-mlp1               &  6 &      25{,}364 &      25{,}123 & $-$1.0\% \\
-transformer\_linear &  6 &      29{,}732 &      30{,}302 & $+$1.9\% \\
-mlp4               &  2 &      39{,}742 &      39{,}362 & $-$1.0\% \\
-resnet50\_chain     & 49 &   5{,}544{,}077 &   5{,}544{,}303 & $+$0.004\% \\
-mobilenet\_struct   & 52 &   3{,}408{,}414 &   3{,}408{,}581 & $+$0.005\% \\
+mlp3               &       1{,}501 &       1{,}433 & $-$4.5\% \\
+mlp2               &       2{,}571 &       2{,}451 & $-$4.7\% \\
+mlp1               &      25{,}364 &      25{,}123 & $-$1.0\% \\
+transformer\_linear &      29{,}732 &      30{,}302 & $+$1.9\% \\
+mlp4               &      39{,}742 &      39{,}362 & $-$1.0\% \\
+resnet50\_chain     &   5{,}544{,}077 &   5{,}544{,}303 & $+$0.004\% \\
+mobilenet\_struct   &   3{,}408{,}414 &   3{,}408{,}581 & $+$0.005\% \\
 \bottomrule
 \end{tabular}
 \end{table}

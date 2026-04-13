@@ -9,7 +9,7 @@
 
 Tensor accelerators occupy a fundamentally different point in the design space than scalar or vector processors.
 Rather than executing fine-grained instruction streams over flat register files and cache-coherent memory, they expose \emph{coarse-grained} operations that consume and produce multi-dimensional tensors and replace implicit caches with \emph{explicitly managed} on-chip memories (scratchpads, accumulator banks).
-Gemmini~\cite{gemmini-dac2021}, Berkeley's open-source systolic-array generator, is representative: it attaches to a Rocket core as a RoCC accelerator~\cite{chipyard} with non-standard RISC-V custom instructions, and its programmer-visible state consists of a row-addressed scratchpad and an accumulator.
+Gemmini~\cite{gemmini-dac2021}, Berkeley's open-source systolic-array generator, is representative: it attaches to a Rocket core~\cite{asanovic2016rocket} via the Rocket Custom Coprocessor (RoCC) interface~\cite{chipyard} with non-standard RISC-V custom instructions, and its programmer-visible state consists of a row-addressed scratchpad and an accumulator.
 Its ISA exposes only configuration, DMA data-movement, and matrix-multiply execution instructions---every operation simultaneously specifies \emph{what} to compute, \emph{where} operands live in a private memory hierarchy, and \emph{how} data should be staged.
 
 This distinctiveness places heavy demands on compiler infrastructure.

@@ -1,4 +1,22 @@
 \section{Related Work}
 \label{sec:related}
 
-% TODO: Write related work
+\paragraph{Formal accelerator interfaces and model extraction.}
+Instruction-Level Abstraction (ILA)~\cite{ila} established a software-visible specification framework for accelerators and processors, while the subsequent autoGenILA work~\cite{autogenilaiccad, autogeniladate} showed how architecture-level models can be derived automatically from RTL designs.
+3LA~\cite{3la} further demonstrated how such formal interfaces can support application-level validation of accelerators.
+TensorLift builds directly on this line of work but differs in its target abstraction: rather than stopping at scalar architectural state updates or validation-oriented interfaces, it lifts extracted semantics to tensor-visible instruction behavior suitable for software-stack generation.
+
+\paragraph{Tensor-accelerator specification and backend automation.}
+TAIDL~\cite{taidl-micro2025} introduced a domain-specific language for expressing tensor-accelerator ISA semantics, and ACT~\cite{act-arxiv} showed that compiler backends can be generated automatically from such specifications.
+These efforts automate the downstream path from ISA description to tooling but assume that a tensor-level specification already exists.
+TensorLift addresses this missing front-end step by recovering TAIDL-like semantics from RTL-derived low-level models.
+
+\paragraph{MLIR and hardware IR semantics.}
+At the compiler-infrastructure level, our work is enabled by MLIR~\cite{mlir-cgo2021} as a progressive abstraction framework, and is adjacent to hardware-oriented MLIR efforts such as CIRCT~\cite{circt}.
+Recent work on K-CIRCT~\cite{kcirct} and first-class verification dialects for MLIR~\cite{fehr2025verification} further highlights the value of giving hardware and compiler IR dialects explicit semantics.
+TensorLift differs from these efforts in emphasis: rather than defining semantics for an existing IR or hardware dialect, it uses MLIR as the staging ground for semantic lifting from extracted hardware behavior to tensor-level ISA descriptions.
+
+\paragraph{Top-down accelerator programming and generation.}
+TensorLift should be distinguished from top-down frameworks such as HeteroCL~\cite{heterocl}, Calyx~\cite{calyx}, and Exo~\cite{exo}.
+Those systems help users design, program, or compile for accelerators from higher-level descriptions, whereas TensorLift is a bottom-up approach that starts from an existing RTL implementation and reconstructs the software-visible tensor interface.
+In that sense, TensorLift also has some affinity with semantic lifting and raising work in binary analysis~\cite{revng}, but its end goal is not generic decompilation to compiler IR; it is recovery of structured tensor semantics that can be consumed by accelerator-specific tooling.

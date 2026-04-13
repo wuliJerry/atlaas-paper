@@ -41,7 +41,8 @@ ax.set_ylim(500, 2e7)
 for i, (h, a, d) in enumerate(zip(hand, act, delta)):
     y_pos = max(h, a) * 1.6
     sign = '+' if d >= 0 else ''
-    ax.text(i, y_pos, f'{sign}{d:.1f}\\%', ha='center', va='bottom', fontsize=5, fontweight='bold')
+    fmt = f'{sign}{d:.3f}' if abs(d) < 0.1 else f'{sign}{d:.1f}'
+    ax.text(i, y_pos, f'{fmt}\\%', ha='center', va='bottom', fontsize=5, fontweight='bold')
 
 ax.legend(fontsize=5.5, loc='upper left', frameon=True, fancybox=False,
           edgecolor='black', framealpha=0.9)

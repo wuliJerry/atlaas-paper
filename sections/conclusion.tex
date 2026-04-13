@@ -1,4 +1,12 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-% TODO: Write conclusion
+We presented TensorLift, the first end-to-end pipeline that automatically lifts RTL-extracted accelerator semantics to tensor-level ISA specifications, addressing the manual specification bottleneck that has prevented automated compiler generation tools from reaching the vast majority of tensor accelerator designs.
+By introducing an 8-pass MLIR semantic lifting pipeline---spanning bit-manipulation canonicalization, MAC pattern detection, control-flow specialization, saturation recovery, loop reconstruction, linalg lifting, and structured metadata emission---TensorLift bridges the abstraction gap between gate-level hardware behavior and the tensor-level semantics required by specification languages like TAIDL.
+
+Evaluated on Gemmini and VTA, TensorLift processes 156 MLIR files totaling over 1.2~million lines of bit-level IR, achieving up to 92.9\% reduction on compute-dominated modules and recovering hardware features---multi-bank DMA configuration, pooling engine semantics, and im2col support---that were absent from hand-written references.
+All lifted semantics are formally verified equivalent to the underlying RTL via Z3 SMT proofs, and the same pipeline generalizes across accelerator architectures without modification.
+By feeding the extracted specification into ACT, TensorLift enables a fully automated path from RTL to a performance-competitive compiler backend, matching hand-written kernel performance to within $\pm$4.7\% on workloads up to ResNet-50 and MobileNet.
+
+More broadly, TensorLift closes the frontmost gap in the RTL-to-framework pipeline: the step from hardware design to machine-readable ISA semantics that has historically required deep architectural expertise and manual effort.
+With this gap filled, the complete automated path---RTL through TensorLift to TAIDL specification, then through ACT to an XLA-compatible compiler backend---is now possible, lowering the barrier for new accelerator designs to achieve full software-stack integration.
