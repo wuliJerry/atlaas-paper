@@ -100,7 +100,7 @@ In summary, this paper makes the following contributions:
 \item We propose the first end-to-end MLIR-based pipeline that lifts RTL-extracted accelerator semantics to TAIDL-like tensor ISA specifications, addressing the manual specification bottleneck that currently blocks the adoption of automated compiler generation tools such as TAIDL and ACT.
 \item We design an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure from bit-level arithmetic through four phases: canonicalization, idiom detection, loop reconstruction, and metadata emission.
 \item We evaluate TensorLift on Gemmini and VTA, achieving up to 92.9\% code reduction on compute modules, discovering hardware features absent from hand-written references, and formally verifying all lifted semantics via Z3 SMT proofs. The same pipeline generalizes across both accelerators without modification.
-\item We close the loop from RTL to ML framework: the extracted specification plugs into ACT to generate a compiler backend that achieves $1.014\times$ geometric mean speedup over hand-written Gemmini kernels on workloads including ResNet-50 and MobileNet.
+\item We close the loop from RTL to ML framework: we contribute HLO frontend support, convolution pattern matching, and multi-layer memory allocation to ACT, enabling end-to-end compilation from the extracted specification to executable binaries that achieve $1.014\times$ geometric mean speedup over hand-written Gemmini kernels on workloads including ResNet-50 and MobileNet.
 \end{itemize}
 
 

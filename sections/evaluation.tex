@@ -184,6 +184,7 @@ To validate that TensorLift's extracted specification is sufficient for practica
 
 \paragraph{Methodology.}
 We take TensorLift's extracted TAIDL specification and pass it to ACT, which generates an XLA-compatible compiler backend using equality saturation for instruction selection and constraint programming for scratchpad memory allocation.
+Completing the path from specification to executable binary required engineering contributions to ACT: HLO frontend support for JAX-produced operations (e.g., \texttt{convolution}, \texttt{reduce\_max}), enode-level preconditions for correct convolution dispatch, and memory allocator support for multi-layer chains.
 We then reimplement the benchmark suite from gemmini-rocc-tests~\cite{gemmini-rocc-tests}---the official bare-metal test suite provided by the Gemmini team---in JAX~\cite{jax2018github}, compiling through the ACT-generated backend.
 For each benchmark, we compare the Spike cycle count of the ACT-compiled binary against the hand-written C kernel from gemmini-rocc-tests, ensuring identical workload parameters: layer shapes, weight-stationary dataflow, activation functions, scaling, and batch sizes.
 The benchmark suite spans MLP, convolutional, and transformer workloads ranging from 2-layer networks (1{,}501 cycles) to full ResNet-50 (5{,}544{,}077 cycles) and MobileNet (3{,}408{,}414 cycles).
