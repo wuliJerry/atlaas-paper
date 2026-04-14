@@ -23,8 +23,7 @@ Generating this sequence requires the backend to know, for every instruction, wh
 This is precisely where most accelerators fall short.
 Mapping tensor IR to an instruction sequence presupposes a \emph{machine-readable} ISA that specifies both the binary encoding and the \emph{tensor-level semantics} of each instruction.
 For Gemmini, semantics live informally in prose documentation, the Chisel RTL, and a hand-written Spike functional model; most open-source accelerators offer only RTL and perhaps a driver.
-Building a backend today is therefore largely an exercise in \emph{manual reverse-engineering of the RTL}---a human infers what each custom instruction means at the tensor level and re-encodes that knowledge by hand.
-This is the bottleneck that motivates automatically lifting tensor-level ISA semantics directly from RTL.
+Building a backend today therefore remains largely an exercise in \emph{manual reverse-engineering of the RTL}.
 
 \subsection{Automated Compiler Generation and the Specification Bottleneck}
 \label{subsec:spec-bottleneck}
@@ -64,7 +63,7 @@ instr.add_semantics(f"""
 
 Built on top of such specifications, ACT~\cite{act-arxiv} (Accelerator Compiler Toolkit) automates what comes after the ISA description. Given a TAIDL specification, ACT automatically generates compiler backends by combining equality saturation for instruction selection with constraint-programming-based memory allocation. The result is an ISA-driven compilation flow in which much of the backend logic is synthesized rather than handwritten. This is particularly attractive for tensor accelerators, whose instructions often operate on parameterized tensor tiles and explicitly managed on-chip memories that are difficult to support using conventional backend-generation techniques.
 
-However, the automation boundary in this pipeline is also its key limitation. TAIDL and ACT automate essentially everything downstream of the ISA specification, but they do not automate the creation of that specification itself. Someone must still write the TAIDL model by hand, including the accelerator's tensor buffers, control state, instruction parameters, constraints, and tensor-level semantics. This remains a manual, expert-driven task that requires deep knowledge of the hardware/software interface. For well-documented accelerators, this process is already labor-intensive; for undocumented or rapidly evolving research accelerators, it becomes the dominant bottleneck preventing end-to-end evaluation. Thus, although ISA-driven automation substantially reduces compiler construction effort, it does not eliminate the front-end specification burden. This manual specification bottleneck directly motivates methods that can recover TAIDL-level semantics from RTL, thereby closing the remaining gap between hardware designs and the automated software-stack generation enabled downstream by TAIDL and ACT.
+However, the automation boundary is also the key limitation: TAIDL and ACT automate everything downstream of the ISA specification, but they do not automate the creation of that specification itself---someone must still write the TAIDL model by hand, a task that requires deep knowledge of the hardware/software interface. This front-end specification burden is the gap that TensorLift addresses.
 
 \subsection{RTL Extraction and MLIR-Based Semantic Lifting}
 \label{subsec:rtl-extraction}
@@ -82,11 +81,7 @@ In other words, autoGenILA solves the \emph{extraction} problem, but not the \em
 
 This is where MLIR (Multi-Level Intermediate Representation) becomes the key enabling substrate.
 The advantage of MLIR is not any hardware-specific frontend, but its support for multi-level, progressive abstraction within one compiler framework~\cite{mlir-cgo2021}.
-In TensorLift's implementation, the extracted semantics are materialized as low-level MLIR in the \texttt{arith} and \texttt{memref} dialects, and are then transformed by a sequence of structured passes: bit-manipulation canonicalization collapses low-level sign-extension idioms into simpler arithmetic forms; type narrowing removes redundant cast chains; MAC detection recovers multiply-accumulate structure; control specialization folds known control modes; clamp detection reconstructs saturation semantics; loop reconstruction converts repeated MAC chains into \texttt{scf.for}; and a final lifting stage recognizes dot-product structure and maps it to \texttt{linalg}-level semantics.
-This progression is exactly the kind of disciplined, dialect-aware rewriting that MLIR was designed to support~\cite{mlir-cgo2021, mlir-pattern-rewriting}.
+In TensorLift's implementation, the extracted semantics are materialized as low-level MLIR in the \texttt{arith} and \texttt{memref} dialects, and are progressively raised through structured passes that leverage MLIR's dialect-aware rewriting infrastructure~\cite{mlir-cgo2021, mlir-pattern-rewriting}.
 
-More importantly, MLIR provides the right semantic stepping stones between bit-level arithmetic and tensor-level intent.
-The \texttt{arith} dialect captures scalar integer and bitwise operations in a canonical compiler form; \texttt{memref} captures explicit memory accesses; \texttt{scf} provides structured control flow for recovered loops; and \texttt{linalg} provides structured representations of tensor computation and contraction~\cite{mlir-pattern-rewriting, mlir-partial-lowering, mlir-linalg-dialect}.
-Because MLIR supports rewrite-driven and partially legalized transformations, TensorLift does not need to jump directly from RTL-like behavior to a fully recovered tensor ISA in one step.
-Instead, it progressively normalizes, annotates, and raises the representation until the recovered semantics are rich enough to emit \texttt{taidl.*} metadata and assemble a TAIDL specification.
-Thus, the central role of MLIR in TensorLift is to bridge the gap between faithful but flattened RTL-derived models and the structured tensor semantics required by downstream compiler automation (Section~\ref{sec:pipeline}).
+More importantly, MLIR provides the right semantic stepping stones between bit-level arithmetic and tensor-level intent: \texttt{arith} for scalar operations, \texttt{memref} for explicit memory accesses, \texttt{scf} for structured control flow, and \texttt{linalg} for tensor computations~\cite{mlir-pattern-rewriting, mlir-partial-lowering, mlir-linalg-dialect}.
+Because MLIR supports rewrite-driven and partially legalized transformations, TensorLift can progressively raise the representation rather than jumping from RTL-level behavior to tensor semantics in one step (Section~\ref{sec:pipeline}).
