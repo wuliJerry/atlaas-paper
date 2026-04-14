@@ -4,14 +4,7 @@
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/overview.pdf}
-  \caption{Overview of the existing landscape and TensorLift's role.
-  The top-down ACT ecosystem~\cite{act-arxiv} assumes a manually written
-  TAIDL specification, while the bottom-up ILA
-  framework~\cite{autogeniladate, autogenilaiccad} produces only scalar-level models.
-  TensorLift bridges this gap with an MLIR-based semantic lifting
-  pipeline that lifts RTL-extracted scalar models to tensor-level
-  ISA specifications, enabling an automated path from hardware
-  design to ML framework integration.}
+  \caption{Overview of the existing landscape. TensorLift bridges the gap between bottom-up RTL extraction (scalar-level models) and top-down compiler automation (which assumes a hand-written TAIDL specification).}
   \label{fig:overview}
 \end{figure}
 
@@ -78,13 +71,7 @@ This manual specification bottleneck is well-documented: writing formal accelera
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/code.pdf}
-  \caption{TensorLift's semantic lifting on a Gemmini PE:
-  from RTL source (\textbf{top}) through 686 lines of bit-level MLIR
-  in which the core MAC is buried under 383 operations (\textbf{middle})
-  to 49 lines of lifted MLIR (92.9\% reduction), of which only the
-  17-line computation core is shown (\textbf{bottom}), annotated with
-  discovered hardware structure (\texttt{tensorlift.mac}) and recovered
-  saturation behavior (\texttt{tensorlift.clamp}).}
+  \caption{TensorLift's semantic lifting on a Gemmini PE: from RTL source (\textbf{top}) through 686 lines of bit-level MLIR (\textbf{middle}) to 49 lines of lifted MLIR (\textbf{bottom}, 92.9\% reduction).}
   \label{fig:code}
 \end{figure}
 

@@ -25,7 +25,7 @@ The hand-written reference specification is the TAIDL MICRO~2025 artifact~\cite{
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/lifting_results.pdf}
-  \caption{MLIR line counts before and after TensorLift's 8-pass lifting pipeline, across all modules of Gemmini and VTA. Percentages indicate reduction. Compute-dominated modules (PE, TensorGemm) achieve the highest reduction because their bit-manipulation chains collapse under canonicalization, while DMA/control modules retain irreducible FSM and address logic.}
+  \caption{MLIR line counts before and after TensorLift's 8-pass lifting pipeline across all modules of Gemmini and VTA. Percentages indicate reduction.}
   \label{fig:lifting-results}
 \end{figure}
 
@@ -153,13 +153,13 @@ TensorLift's specification provides this macro-level abstraction (Stage~3, \S\re
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/latency_comparison.pdf}
-  \caption{Cycle-level comparison on Gemmini's Spike simulator between hand-written kernels from gemmini-rocc-tests~\cite{gemmini-rocc-tests} and the automatically generated ACT compiler backend driven by TensorLift's extracted TAIDL specification. Labels show speedup (hand-written cycles\,/\,ACT cycles; ${>}\,1{\times}$ = ACT is faster). Geometric mean speedup is $1.014\times$.}
+  \caption{Cycle-level latency comparison between hand-written Gemmini kernels and the TensorLift+ACT compiler backend on Spike. Labels show speedup (${>}\,1{\times}$ = ACT is faster).}
   \label{fig:latency}
 \end{figure}
 
 \begin{table}[t]
 \centering
-\caption{Latency comparison between hand-written Gemmini kernels and the TensorLift + ACT compiler backend, measured in Spike simulator cycles. Speedup $=$ hand-written\,/\,TensorLift+ACT (${>}\,1{\times}$ = ACT is faster). All benchmarks execute identical workloads (same layer shapes, dataflow, activation, scaling).}
+\caption{Latency comparison in Spike simulator cycles. Speedup $=$ hand-written\,/\,TensorLift+ACT (${>}\,1{\times}$ = ACT is faster).}
 \label{tab:latency}
 \setlength{\tabcolsep}{3pt}
 \scriptsize

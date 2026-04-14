@@ -33,7 +33,7 @@ Recent work has shown that the main barrier to end-to-end software support for t
 A representative TAIDL specification therefore looks less like microarchitectural pseudocode and more like a tensor transformation. For example, a simplified multiply-accumulate style instruction can be expressed as follows:
 
 \begin{figure}[h]
-\begin{lstlisting}[style=taidl, caption={Simplified TAIDL specification for a Gemmini multiply-accumulate instruction (adapted from~\cite{taidl-ae-micro2025}). The real specification additionally includes dataflow-dependent operand routing (\texttt{IF/@s.dataflow}) and state constraint/update logic; here we show only the core tensor semantics: type promotion\, contraction\, accumulation\, saturation clamp\, and write-back.}, label={lst:taidl-example}]
+\begin{lstlisting}[style=taidl, caption={Simplified TAIDL specification for a Gemmini multiply-accumulate instruction (adapted from~\cite{taidl-ae-micro2025}). Only the core tensor semantics are shown; the full specification additionally includes dataflow routing and state constraint logic.}, label={lst:taidl-example}]
 # Data model: scratchpad and accumulator
 acc.add_data_model("sp", "1024*DIM", f"{DIM}xs8")
 acc.add_data_model("bias", f"{DIM}", f"{DIM}xs32")
