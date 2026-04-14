@@ -155,27 +155,29 @@ TensorLift's specification provides this macro-level abstraction (Stage~3, \S\re
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/latency_comparison.pdf}
-  \caption{Cycle-level comparison on Gemmini's Spike simulator between hand-written kernels from gemmini-rocc-tests~\cite{gemmini-rocc-tests} and the automatically generated ACT compiler backend driven by TensorLift's extracted TAIDL specification. Percentages show cycle-count delta (negative = ACT is faster). All benchmarks are within $\pm$4.7\% of hand-written performance, with large workloads (ResNet-50, MobileNet) matching to within $\pm$0.005\%.}
+  \caption{Cycle-level comparison on Gemmini's Spike simulator between hand-written kernels from gemmini-rocc-tests~\cite{gemmini-rocc-tests} and the automatically generated ACT compiler backend driven by TensorLift's extracted TAIDL specification. Labels show speedup (hand-written cycles\,/\,ACT cycles; ${>}\,1{\times}$ = ACT is faster). Geometric mean speedup is $1.014\times$.}
   \label{fig:latency}
 \end{figure}
 
 \begin{table}[t]
 \centering
-\caption{Latency comparison between hand-written Gemmini kernels and the TensorLift + ACT compiler backend, measured in Spike simulator cycles. All benchmarks execute identical workloads (same layer shapes, dataflow, activation, scaling).}
+\caption{Latency comparison between hand-written Gemmini kernels and the TensorLift + ACT compiler backend, measured in Spike simulator cycles. Speedup $=$ hand-written\,/\,TensorLift+ACT (${>}\,1{\times}$ = ACT is faster). All benchmarks execute identical workloads (same layer shapes, dataflow, activation, scaling).}
 \label{tab:latency}
 \setlength{\tabcolsep}{3pt}
 \scriptsize
 \begin{tabular}{@{}l r r r@{}}
 \toprule
-Benchmark & Hand-written & TensorLift+ACT & Delta \\
+Benchmark & Hand-written & TensorLift+ACT & Speedup \\
 \midrule
-mlp3               &       1{,}501 &       1{,}433 & $-$4.5\% \\
-mlp2               &       2{,}571 &       2{,}451 & $-$4.7\% \\
-mlp1               &      25{,}364 &      25{,}123 & $-$1.0\% \\
-transformer\_linear &      29{,}732 &      30{,}302 & $+$1.9\% \\
-mlp4               &      39{,}742 &      39{,}362 & $-$1.0\% \\
-resnet50\_chain     &   5{,}544{,}077 &   5{,}544{,}303 & $+$0.004\% \\
-mobilenet\_struct   &   3{,}408{,}414 &   3{,}408{,}581 & $+$0.005\% \\
+mlp3               &       1{,}501 &       1{,}433 & $1.047\times$ \\
+mlp2               &       2{,}571 &       2{,}451 & $1.049\times$ \\
+mlp1               &      25{,}364 &      25{,}123 & $1.010\times$ \\
+transformer\_linear &      29{,}732 &      30{,}302 & $0.981\times$ \\
+mlp4               &      39{,}742 &      39{,}362 & $1.010\times$ \\
+resnet50\_chain     &   5{,}544{,}077 &   5{,}544{,}303 & $1.000\times$ \\
+mobilenet\_struct   &   3{,}408{,}414 &   3{,}408{,}581 & $1.000\times$ \\
+\midrule
+\multicolumn{3}{@{}l}{\textit{Geometric mean}} & $1.014\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -190,10 +192,9 @@ The benchmark suite spans MLP, convolutional, and transformer workloads ranging 
 
 \paragraph{Results.}
 Table~\ref{tab:latency} and Figure~\ref{fig:latency} report the results.
-Across all seven benchmarks, the automatically generated backend matches hand-written kernel performance to within $\pm$4.7\%.
-The small MLP benchmarks (mlp2, mlp3) show the ACT backend running slightly faster ($-$4.5\% to $-$4.7\%), reflecting minor tiling differences in the generated code.
-The transformer benchmark shows the largest positive delta ($+$1.9\%), attributable to per-tile configuration overhead in the generated instruction sequence.
-On the large workloads that dominate real deployment---ResNet-50 (49 conv layers) and MobileNet (52 layers)---the cycle counts are nearly identical: $+$227 cycles out of 5{,}544{,}077 ($+$0.004\%) for ResNet-50 and $+$167 out of 3{,}408{,}414 ($+$0.005\%) for MobileNet.
-Deltas this small confirm that both sides execute byte-identical tiled convolution sequences; the residual difference is fixed per-call setup overhead.
+Across all seven benchmarks, the automatically generated backend achieves a geometric mean speedup of $1.014\times$ over hand-written kernels, with per-benchmark speedups ranging from $0.981\times$ to $1.049\times$.
+The small MLP benchmarks (mlp2, mlp3) show the ACT backend running slightly faster ($1.047$--$1.049\times$), reflecting minor tiling differences in the generated code.
+The transformer benchmark shows the only slowdown ($0.981\times$), attributable to per-tile configuration overhead in the generated instruction sequence.
+On the large workloads that dominate real deployment---ResNet-50 (49 conv layers) and MobileNet (52 layers)---the speedup is $1.000\times$, confirming that both sides execute byte-identical tiled convolution sequences; the residual difference is fixed per-call setup overhead.
 
 This result demonstrates that TensorLift, combined with ACT, enables a fully automated path from RTL to a functional, performance-competitive compiler backend.

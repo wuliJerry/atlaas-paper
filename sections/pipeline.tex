@@ -1,7 +1,14 @@
 \section{TensorLift Pipeline}
 \label{sec:pipeline}
 
-TensorLift transforms an unannotated RTL design into a TAIDL specification through three stages (Figure~\ref{fig:overview}):
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig/pipeline.pdf}
+  \caption{TensorLift's three-stage pipeline: RTL-to-MLIR extraction (Stage~1), eight-pass semantic lifting (Stage~2), and TAIDL assembly with compute/DMA paths and FSM recovery (Stage~3).}
+  \label{fig:pipeline}
+\end{figure}
+
+TensorLift transforms an unannotated RTL design into a TAIDL specification through three stages (Figures~\ref{fig:overview} and~\ref{fig:pipeline}):
 \textbf{Stage~1 (\S\ref{subsec:stage1})} symbolically extracts per-instruction behavior from the RTL into bit-level MLIR;
 \textbf{Stage~2 (\S\ref{subsec:stage2})} progressively lifts that bit-level representation to tensor-level semantics via an eight-pass rewrite pipeline;
 \textbf{Stage~3 (\S\ref{subsec:stage3})} assembles the lifted MLIR into a TAIDL specification with XLA-HLO-style semantics.

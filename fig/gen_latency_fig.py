@@ -21,7 +21,7 @@ benchmarks = [
 ]
 hand = np.array([1_501, 2_571, 25_364, 29_732, 39_742, 5_544_077, 3_408_414])
 act  = np.array([1_433, 2_451, 25_123, 30_302, 39_362, 5_544_303, 3_408_581])
-delta = (act - hand) / hand * 100
+speedup = hand / act
 
 fig, ax = plt.subplots(figsize=(3.5, 2.0))
 
@@ -38,11 +38,9 @@ ax.set_xticklabels(benchmarks, fontsize=5)
 ax.set_ylim(500, 2e7)
 
 # Annotate delta %
-for i, (h, a, d) in enumerate(zip(hand, act, delta)):
+for i, (h, a, s) in enumerate(zip(hand, act, speedup)):
     y_pos = max(h, a) * 1.6
-    sign = '+' if d >= 0 else ''
-    fmt = f'{sign}{d:.3f}' if abs(d) < 0.1 else f'{sign}{d:.1f}'
-    ax.text(i, y_pos, f'{fmt}\\%', ha='center', va='bottom', fontsize=5, fontweight='bold')
+    ax.text(i, y_pos, f'{s:.3f}$\\times$', ha='center', va='bottom', fontsize=5, fontweight='bold')
 
 ax.legend(fontsize=5.5, loc='upper left', frameon=True, fancybox=False,
           edgecolor='black', framealpha=0.9)
