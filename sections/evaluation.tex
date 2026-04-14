@@ -114,9 +114,7 @@ All extracted instruction behaviors---GEMM tensor contraction, ALU element-wise 
 \subsection{Specification Completeness}
 \label{subsec:completeness}
 
-TensorLift extracts TAIDL specifications for \textbf{30 of 31} instructions listed in Gemmini's documentation.
-The single omitted entry, \texttt{fence}, is a host RISC-V instruction (not a RoCC accelerator instruction~\cite{asanovic2016rocket})---it is included in the Gemmini documentation only for completeness of the programming interface.
-TensorLift correctly identifies this boundary: it extracts only instructions that are decoded and executed by Gemmini's hardware controllers.
+TensorLift extracts TAIDL specifications for all hardware instructions decoded and executed by Gemmini's three controllers (ExecuteController, LoadController, StoreController).
 
 \paragraph{Comparison with hand-written reference.}
 We compare TensorLift's extracted specification against the TAIDL MICRO~2025 artifact~\cite{taidl-ae-micro2025}, which provides a hand-written Gemmini specification.
@@ -185,7 +183,7 @@ mobilenet\_struct   &   3{,}408{,}414 &   3{,}408{,}581 & $1.000\times$ \\
 To validate that TensorLift's extracted specification is sufficient for practical use, we feed it into the ACT compiler framework~\cite{act-arxiv} to automatically generate a Gemmini compiler backend, and compare the generated code against hand-written kernels on realistic workloads.
 
 \paragraph{Methodology.}
-We take TensorLift's 30-instruction TAIDL specification and pass it to ACT, which generates an XLA-compatible compiler backend using equality saturation for instruction selection and constraint programming for scratchpad memory allocation.
+We take TensorLift's extracted TAIDL specification and pass it to ACT, which generates an XLA-compatible compiler backend using equality saturation for instruction selection and constraint programming for scratchpad memory allocation.
 We then reimplement the benchmark suite from gemmini-rocc-tests~\cite{gemmini-rocc-tests}---the official bare-metal test suite provided by the Gemmini team---in JAX~\cite{jax2018github}, compiling through the ACT-generated backend.
 For each benchmark, we compare the Spike cycle count of the ACT-compiled binary against the hand-written C kernel from gemmini-rocc-tests, ensuring identical workload parameters: layer shapes, weight-stationary dataflow, activation functions, scaling, and batch sizes.
 The benchmark suite spans MLP, convolutional, and transformer workloads ranging from 2-layer networks (1{,}501 cycles) to full ResNet-50 (5{,}544{,}077 cycles) and MobileNet (3{,}408{,}414 cycles).
