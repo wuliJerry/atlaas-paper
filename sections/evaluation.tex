@@ -195,6 +195,6 @@ Table~\ref{tab:latency} and Figure~\ref{fig:latency} report the results.
 Across all seven benchmarks, the automatically generated backend achieves a geometric mean speedup of $1.014\times$ over hand-written kernels, with per-benchmark speedups ranging from $0.981\times$ to $1.049\times$.
 The small MLP benchmarks (mlp2, mlp3) show the ACT backend running slightly faster ($1.047$--$1.049\times$), reflecting minor tiling differences in the generated code.
 The transformer benchmark shows the only slowdown ($0.981\times$), attributable to per-tile configuration overhead in the generated instruction sequence.
-On the large workloads that dominate real deployment---ResNet-50 (49 conv layers) and MobileNet (52 layers)---the speedup is $1.000\times$, confirming that both sides execute byte-identical tiled convolution sequences; the residual difference is fixed per-call setup overhead.
+On the large workloads that dominate real deployment---ResNet-50 (49 conv layers) and MobileNet (52 layers)---the speedup is $1.000\times$.
 
 This result demonstrates that TensorLift, combined with ACT, enables a fully automated path from RTL to a functional, performance-competitive compiler backend.
