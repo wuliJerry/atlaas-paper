@@ -63,7 +63,7 @@ instr.add_semantics(f"""
 
 Built on top of such specifications, ACT~\cite{act-arxiv} (Accelerator Compiler Toolkit) automates what comes after the ISA description. Given a TAIDL specification, ACT automatically generates compiler backends by combining equality saturation for instruction selection with constraint-programming-based memory allocation. The result is an ISA-driven compilation flow in which much of the backend logic is synthesized rather than handwritten. This is particularly attractive for tensor accelerators, whose instructions often operate on parameterized tensor tiles and explicitly managed on-chip memories that are difficult to support using conventional backend-generation techniques.
 
-However, the automation boundary is also the key limitation: TAIDL and ACT automate everything downstream of the ISA specification, but they do not automate the creation of that specification itself---someone must still write the TAIDL model by hand, a task that requires deep knowledge of the hardware/software interface. This front-end specification burden is the gap that TensorLift addresses.
+However, the automation boundary is also the key limitation: TAIDL and ACT automate everything downstream of the ISA specification, but they do not automate the creation of that specification itself---someone must still write the TAIDL model by hand, a task that requires deep knowledge of the hardware/software interface. This front-end specification burden is the gap that ATLAAS addresses.
 
 \subsection{RTL Extraction and MLIR-Based Semantic Lifting}
 \label{subsec:rtl-extraction}
@@ -71,7 +71,7 @@ However, the automation boundary is also the key limitation: TAIDL and ACT autom
 A natural baseline for recovering ISA semantics from hardware is architecture-level model extraction from RTL.
 The relevant starting point is the autoGenILA line of work~\cite{autogenilaiccad, autogeniladate}, which first identifies the architectural state variables (ASVs) that persist across instructions and then derives the corresponding state update functions for each instruction directly from RTL.
 This removes the need to manually write an Instruction-Level Abstraction (ILA)~\cite{ila} model and yields an architecture-level interface that is consistent with the hardware implementation by construction.
-In TensorLift's workflow, autoGenILA serves exactly this role: it is the extraction backend that converts accelerator RTL into per-instruction semantic functions, providing the raw material for later lifting.
+In ATLAAS's workflow, autoGenILA serves exactly this role: it is the extraction backend that converts accelerator RTL into per-instruction semantic functions, providing the raw material for later lifting.
 
 The problem is that these extracted models are still too low-level for tensor compiler generation.
 autoGenILA captures hardware behavior faithfully, but the output remains a flattened, bit-level scalar model in which high-level tensor intent is obscured by the structure of the datapath~\cite{autogenilaiccad, autogeniladate}.
@@ -81,7 +81,7 @@ In other words, autoGenILA solves the \emph{extraction} problem, but not the \em
 
 This is where MLIR (Multi-Level Intermediate Representation) becomes the key enabling substrate.
 The advantage of MLIR is not any hardware-specific frontend, but its support for multi-level, progressive abstraction within one compiler framework~\cite{mlir-cgo2021}.
-In TensorLift's implementation, the extracted semantics are materialized as low-level MLIR in the \texttt{arith} and \texttt{memref} dialects, and are progressively raised through structured passes that leverage MLIR's dialect-aware rewriting infrastructure~\cite{mlir-cgo2021, mlir-pattern-rewriting}.
+In ATLAAS's implementation, the extracted semantics are materialized as low-level MLIR in the \texttt{arith} and \texttt{memref} dialects, and are progressively raised through structured passes that leverage MLIR's dialect-aware rewriting infrastructure~\cite{mlir-cgo2021, mlir-pattern-rewriting}.
 
 More importantly, MLIR provides the right semantic stepping stones between bit-level arithmetic and tensor-level intent: \texttt{arith} for scalar operations, \texttt{memref} for explicit memory accesses, \texttt{scf} for structured control flow, and \texttt{linalg} for tensor computations~\cite{mlir-pattern-rewriting, mlir-partial-lowering, mlir-linalg-dialect}.
-Because MLIR supports rewrite-driven and partially legalized transformations, TensorLift can progressively raise the representation rather than jumping from RTL-level behavior to tensor semantics in one step (Section~\ref{sec:pipeline}).
+Because MLIR supports rewrite-driven and partially legalized transformations, ATLAAS can progressively raise the representation rather than jumping from RTL-level behavior to tensor semantics in one step (Section~\ref{sec:pipeline}).

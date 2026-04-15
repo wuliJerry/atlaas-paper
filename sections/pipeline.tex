@@ -1,14 +1,14 @@
-\section{TensorLift Pipeline}
+\section{ATLAAS Pipeline}
 \label{sec:pipeline}
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/pipeline.pdf}
-  \caption{TensorLift's three-stage pipeline: RTL-to-MLIR extraction (Stage~1), eight-pass semantic lifting (Stage~2), and TAIDL assembly with compute/DMA paths and FSM recovery (Stage~3).}
+  \caption{ATLAAS's three-stage pipeline: RTL-to-MLIR extraction (Stage~1), eight-pass semantic lifting (Stage~2), and TAIDL assembly with compute/DMA paths and FSM recovery (Stage~3).}
   \label{fig:pipeline}
 \end{figure}
 
-TensorLift transforms an unannotated RTL design into a TAIDL specification through three stages (Figures~\ref{fig:overview} and~\ref{fig:pipeline}):
+ATLAAS transforms an unannotated RTL design into a TAIDL specification through three stages (Figures~\ref{fig:overview} and~\ref{fig:pipeline}):
 \textbf{Stage~1 (\S\ref{subsec:stage1})} symbolically extracts per-instruction behavior from the RTL into bit-level MLIR;
 \textbf{Stage~2 (\S\ref{subsec:stage2})} progressively lifts that bit-level representation to tensor-level semantics via an eight-pass rewrite pipeline;
 \textbf{Stage~3 (\S\ref{subsec:stage3})} assembles the lifted MLIR into a TAIDL specification with XLA-HLO-style semantics.
@@ -22,7 +22,7 @@ However, autoGenILA's LLVM IR backend destroys two structural properties that te
 First, conditional updates are lowered into branches and \texttt{phi} nodes, erasing the if/else structure that encodes hardware mode selection.
 Second, RTL signal names---which identify whether an input carries activations, weights, or an accumulator---are discarded during lowering.
 
-TensorLift replaces the LLVM IR backend with an MLIR code generator that preserves both.
+ATLAAS replaces the LLVM IR backend with an MLIR code generator that preserves both.
 Conditional updates become \texttt{scf.if} regions; memory accesses remain as indexed \texttt{memref} loads; and original RTL signal names are attached as structured metadata that downstream passes consult to classify arguments semantically.
 A second design choice packs the time series of each input signal across unroll cycles into a single \texttt{memref} argument rather than flattening them into hundreds of independent scalars---this grouping is what later enables loop reconstruction (\S\ref{subsec:stage2}) to recover MAC chains as indexable reductions.
 An automation layer generates flattening scripts, enumerates architectural state variables, and discovers instruction encodings from the RTL decoder, reducing the per-design manual input to two items.
@@ -34,7 +34,7 @@ As Figure~\ref{fig:code} illustrates, even a single Gemmini PE produces 686 line
 \subsection{Stage 2: Semantic Lifting}
 \label{subsec:stage2}
 
-Stage~2 is the analytical core of TensorLift: an eight-pass MLIR pipeline that progressively recovers tensor-level semantics from the bit-level Stage~1 output.
+Stage~2 is the analytical core of ATLAAS: an eight-pass MLIR pipeline that progressively recovers tensor-level semantics from the bit-level Stage~1 output.
 The passes fall into four phases (Table~\ref{tab:lifting-passes}).
 
 \textbf{Phase~A (canonicalization)} collapses the bit-by-bit sign-extension chains that arise from Verilog \texttt{\$signed} contexts into single cast operations, and folds redundant width round-trips---the dominant source of code reduction.
@@ -44,7 +44,7 @@ The passes fall into four phases (Table~\ref{tab:lifting-passes}).
 
 \begin{table}[t]
 \centering
-\caption{TensorLift's eight-pass MLIR semantic-lifting pipeline. Each pass is named with its \texttt{tensorlift-opt} flag.}
+\caption{ATLAAS's eight-pass MLIR semantic-lifting pipeline. Each pass is named with its \texttt{atlaas-opt} flag.}
 \label{tab:lifting-passes}
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.18}
@@ -59,7 +59,7 @@ A2 \texttt{narrow-types}
 & Folds redundant \texttt{trunci}/\texttt{ext} round trips left over after canonicalization, while deliberately preserving the \texttt{extsi(trunci(\,))} idioms that Pass~B5 must recover as saturation. \\
 \addlinespace[1pt]
 B3 \texttt{detect-mac}
-& Walks each \texttt{addi} back through width casts to find a multiplier and recovers its pre-extension inputs; tags the pair with \texttt{tensorlift.mac} when the operand widths are hardware-realistic, filtering out bit-packing artifacts. \\
+& Walks each \texttt{addi} back through width casts to find a multiplier and recovers its pre-extension inputs; tags the pair with \texttt{atlaas.mac} when the operand widths are hardware-realistic, filtering out bit-packing artifacts. \\
 B4 \texttt{specialize-control}
 & Constant-folds the loads of the fixed control inputs of the instruction under analysis (taken from the same instruction descriptor that drove Stage~1), letting downstream canonicalization eliminate the \texttt{select} chains that selected between hardware modes. \\
 B5 \texttt{detect-clamp}
@@ -92,5 +92,5 @@ It first merges the per-(instruction, ASV) functions back into per-instruction g
 The \emph{compute path} maps each tensor op to an XLA-HLO template: \texttt{dot\_product} expands to \texttt{convert\,+\,dot\,+\,add} (with optional \texttt{clamp}), \texttt{pool} to \texttt{reduce(max)}, and \texttt{im2col\_matmul} to \texttt{reshape\,+\,dot\,+\,add}; when the RTL encodes an activation function, the corresponding HLO operation is inserted (e.g., \texttt{maximum(result,\,0)} for ReLU).
 The \emph{DMA path} classifies memory-port roles (DRAM address vs.\ scratchpad address) from the annotated metadata and emits a \texttt{load} or \texttt{store} body accordingly.
 
-For CISC-style loop macros that orchestrate sequences of primitive instructions behind a single invocation (e.g., Gemmini's \texttt{loop\_ws}), TensorLift recovers the primitive instruction vocabulary and loop-bound configuration registers from the controller's RTL, then composes the primitive tensor operation over the extracted bounds into a whole-program HLO body.
+For CISC-style loop macros that orchestrate sequences of primitive instructions behind a single invocation (e.g., Gemmini's \texttt{loop\_ws}), ATLAAS recovers the primitive instruction vocabulary and loop-bound configuration registers from the controller's RTL, then composes the primitive tensor operation over the extracted bounds into a whole-program HLO body.
 Instruction ordering constraints---e.g., that \texttt{compute\_preloaded} may only fire after \texttt{preload}---are recovered by analyzing FSM register updates across instruction groups and folded into the specification as structured metadata.

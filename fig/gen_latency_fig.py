@@ -29,7 +29,7 @@ x = np.arange(len(benchmarks))
 w = 0.35
 
 bars_h = ax.bar(x - w/2, hand, w, label='Hand-written kernel', color=pal[2], edgecolor='black', linewidth=0.3, zorder=3)
-bars_a = ax.bar(x + w/2, act,  w, label='TensorLift + ACT',    color=pal[3], edgecolor='black', linewidth=0.3, zorder=3)
+bars_a = ax.bar(x + w/2, act,  w, label='ATLAAS + ACT',    color=pal[3], edgecolor='black', linewidth=0.3, zorder=3)
 
 ax.set_yscale('log')
 ax.set_ylabel('Spike Cycles (log scale)')

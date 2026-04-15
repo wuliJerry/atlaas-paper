@@ -4,7 +4,7 @@
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/overview.pdf}
-  \caption{Overview of the existing landscape. TensorLift bridges the gap between bottom-up RTL extraction (scalar-level models) and top-down compiler automation (which assumes a hand-written TAIDL specification).}
+  \caption{Overview of the existing landscape. ATLAAS bridges the gap between bottom-up RTL extraction (scalar-level models) and top-down compiler automation (which assumes a hand-written TAIDL specification).}
   \label{fig:overview}
 \end{figure}
 
@@ -15,7 +15,7 @@ The rapid growth of deep learning workloads has driven a proliferation of specia
   \scriptsize
   \caption{Software stack readiness of representative open-source tensor/DNN accelerators.
   \CIRCLE{} = available, \LEFTcircle{} = partial/limited, \Circle{} = unavailable.
-  \textbf{TensorLift} targets accelerators with open RTL (\CIRCLE{}/\LEFTcircle{} in col.~3)
+  \textbf{ATLAAS} targets accelerators with open RTL (\CIRCLE{}/\LEFTcircle{} in col.~3)
   but missing ISA specifications (\Circle{} in col.~1).}
   \label{tab:accel-landscape}
   \setlength{\tabcolsep}{3pt}
@@ -71,22 +71,22 @@ This manual specification bottleneck is well-documented: writing formal accelera
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/code.pdf}
-  \caption{TensorLift's semantic lifting on a Gemmini PE: from RTL source (\textbf{top}) through 686 lines of bit-level MLIR (\textbf{middle}) to 49 lines of lifted MLIR (\textbf{bottom}, 92.9\% reduction).}
+  \caption{ATLAAS's semantic lifting on a Gemmini PE: from RTL source (\textbf{top}) through 686 lines of bit-level MLIR (\textbf{middle}) to 49 lines of lifted MLIR (\textbf{bottom}, 92.9\% reduction).}
   \label{fig:code}
 \end{figure}
 
-In this paper, we present TensorLift, the first end-to-end MLIR-based pipeline that lifts RTL-extracted accelerator semantics to TAIDL-like tensor ISA specifications. Building on prior architecture-level model extraction~\cite{autogeniladate, autogenilaiccad} that produces bit-level MLIR from flattened RTL, TensorLift employs an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure---from bit-manipulation canonicalization through idiom detection and loop reconstruction to structured metadata emission---bridging the abstraction gap between gate-level hardware and the tensor-level semantics required by tools like TAIDL and ACT (Figure~\ref{fig:code}).
+In this paper, we present ATLAAS, the first end-to-end MLIR-based pipeline that lifts RTL-extracted accelerator semantics to TAIDL-like tensor ISA specifications. Building on prior architecture-level model extraction~\cite{autogeniladate, autogenilaiccad} that produces bit-level MLIR from flattened RTL, ATLAAS employs an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure---from bit-manipulation canonicalization through idiom detection and loop reconstruction to structured metadata emission---bridging the abstraction gap between gate-level hardware and the tensor-level semantics required by tools like TAIDL and ACT (Figure~\ref{fig:code}).
 
-We evaluate TensorLift on two open-source accelerators: Berkeley's Gemmini (systolic array, 16$\times$16, INT8) and TVM's VTA. The lifting pipeline achieves up to 92.9\% reduction on compute-dominated modules, discovers hardware features omitted from hand-written references, and generalizes across both accelerators without modification. All lifted semantics are formally verified equivalent to the RTL via Z3~\cite{z3} SMT proofs. Fed into ACT, the extracted specification yields a compiler backend that achieves a geometric mean speedup of $1.014\times$ over hand-written Gemmini kernels on workloads including ResNet-50 and MobileNet.
+We evaluate ATLAAS on two open-source accelerators: Berkeley's Gemmini (systolic array, 16$\times$16, INT8) and TVM's VTA. The lifting pipeline achieves up to 92.9\% reduction on compute-dominated modules, discovers hardware features omitted from hand-written references, and generalizes across both accelerators without modification. All lifted semantics are formally verified equivalent to the RTL via Z3~\cite{z3} SMT proofs. Fed into ACT, the extracted specification yields a compiler backend that achieves a geometric mean speedup of $1.014\times$ over hand-written Gemmini kernels on workloads including ResNet-50 and MobileNet.
 
-By filling the frontmost gap in the RTL-to-framework pipeline, TensorLift enables an automated path from RTL to ML framework integration, as illustrated in Figure~\ref{fig:overview}. The complete pipeline---RTL through TensorLift to ISA specification, then through ACT to a compiler backend plugged into XLA---removes the need to hand-write the tensor-level ISA model, the step that has historically been the dominant bottleneck.
+By filling the frontmost gap in the RTL-to-framework pipeline, ATLAAS enables an automated path from RTL to ML framework integration, as illustrated in Figure~\ref{fig:overview}. The complete pipeline---RTL through ATLAAS to ISA specification, then through ACT to a compiler backend plugged into XLA---removes the need to hand-write the tensor-level ISA model, the step that has historically been the dominant bottleneck.
 
 In summary, this paper makes the following contributions:
 
 \begin{itemize}
 \item We propose the first end-to-end MLIR-based pipeline that lifts RTL-extracted accelerator semantics to TAIDL-like tensor ISA specifications, addressing the manual specification bottleneck that currently blocks the adoption of automated compiler generation tools such as TAIDL and ACT.
 \item We design an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure from bit-level arithmetic through four phases: canonicalization, idiom detection, loop reconstruction, and metadata emission.
-\item We evaluate TensorLift on Gemmini and VTA, achieving up to 92.9\% code reduction on compute modules, discovering hardware features absent from hand-written references, and formally verifying all lifted semantics via Z3 SMT proofs. The same pipeline generalizes across both accelerators without modification.
+\item We evaluate ATLAAS on Gemmini and VTA, achieving up to 92.9\% code reduction on compute modules, discovering hardware features absent from hand-written references, and formally verifying all lifted semantics via Z3 SMT proofs. The same pipeline generalizes across both accelerators without modification.
 \item We close the loop from RTL to ML framework: we contribute HLO frontend support, convolution pattern matching, and multi-layer memory allocation to ACT, enabling end-to-end compilation from the extracted specification to executable binaries that achieve $1.014\times$ geometric mean speedup over hand-written Gemmini kernels on workloads including ResNet-50 and MobileNet.
 \end{itemize}
 

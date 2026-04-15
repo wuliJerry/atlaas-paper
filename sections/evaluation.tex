@@ -1,7 +1,7 @@
 \section{Evaluation}
 \label{sec:evaluation}
 
-We evaluate TensorLift along four axes:
+We evaluate ATLAAS along four axes:
 (\S\ref{subsec:lifting-effectiveness})~how effectively the lifting pipeline compresses bit-level MLIR into tensor-level semantics;
 (\S\ref{subsec:correctness})~whether the lifted semantics are provably equivalent to the RTL;
 (\S\ref{subsec:completeness})~how the automatically extracted specification compares to a hand-written reference; and
@@ -25,7 +25,7 @@ The hand-written reference specification is the TAIDL MICRO~2025 artifact~\cite{
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/lifting_results.pdf}
-  \caption{MLIR line counts before and after TensorLift's 8-pass lifting pipeline across all modules of Gemmini and VTA. Percentages indicate reduction.}
+  \caption{MLIR line counts before and after ATLAAS's 8-pass lifting pipeline across all modules of Gemmini and VTA. Percentages indicate reduction.}
   \label{fig:lifting-results}
 \end{figure}
 
@@ -61,7 +61,7 @@ Accelerator & Module & Files & Before & After & Reduction \\
 \end{table}
 
 Table~\ref{tab:lifting-summary} and Figure~\ref{fig:lifting-results} report the lifting results across all modules of both accelerators.
-In total, TensorLift processes 156 MLIR files comprising 1{,}212{,}307 lines of bit-level MLIR, reducing them to 895{,}069 lines (26.2\% overall reduction).
+In total, ATLAAS processes 156 MLIR files comprising 1{,}212{,}307 lines of bit-level MLIR, reducing them to 895{,}069 lines (26.2\% overall reduction).
 
 The reduction varies dramatically with module function.
 \textbf{Compute-dominated modules} achieve the highest compression.
@@ -79,8 +79,8 @@ VTA's overall higher reduction (41.2\% vs.\ 24.8\%) reflects the fact that its T
 \subsection{Correctness Verification}
 \label{subsec:correctness}
 
-We verify that TensorLift's lifted semantics are equivalent to the bit-level scalar model from which they are derived.
-Since autoGenILA's extraction is provably bit-equivalent to the RTL by construction~\cite{autogenilaiccad, autogeniladate}, establishing equivalence between the lifted MLIR and autoGenILA's output transitively proves: \textbf{RTL behavior $\equiv$ TensorLift semantics}.
+We verify that ATLAAS's lifted semantics are equivalent to the bit-level scalar model from which they are derived.
+Since autoGenILA's extraction is provably bit-equivalent to the RTL by construction~\cite{autogenilaiccad, autogeniladate}, establishing equivalence between the lifted MLIR and autoGenILA's output transitively proves: \textbf{RTL behavior $\equiv$ ATLAAS semantics}.
 
 \begin{table}[t]
 \centering
@@ -108,44 +108,44 @@ The weight-stationary dataflow mux (control specialization, Pass~B4) and DMA cop
 For VTA, 13 targets across all four datapath modules (TensorGemm, TensorAlu, Store, GenVMECmd) are proven equivalent to the LLVM IR output, covering both compute and control semantics.
 Additionally, the lifting pipeline reveals a structural symmetry: VTA's input and weight index generators produce identical 146-line MLIR after lifting, consistent with the symmetric roles of these buffers in the GEMM engine.
 
-As an independent cross-check, we compare TensorLift's extracted VTA semantics against the ISA operational semantics documented in the VTA specification~\cite{vta} (\S6--9).
+As an independent cross-check, we compare ATLAAS's extracted VTA semantics against the ISA operational semantics documented in the VTA specification~\cite{vta} (\S6--9).
 All extracted instruction behaviors---GEMM tensor contraction, ALU element-wise operations with five opcodes, Store DMA command generation, and Load burst addressing---align with the published specification, confirming that the lifting pipeline recovers the documented ISA semantics without access to the specification document.
 
 \subsection{Specification Completeness}
 \label{subsec:completeness}
 
-TensorLift extracts TAIDL specifications for all hardware instructions decoded and executed by Gemmini's three controllers (ExecuteController, LoadController, StoreController).
+ATLAAS extracts TAIDL specifications for all hardware instructions decoded and executed by Gemmini's three controllers (ExecuteController, LoadController, StoreController).
 
 \paragraph{Comparison with hand-written reference.}
-We compare TensorLift's extracted specification against the TAIDL MICRO~2025 artifact~\cite{taidl-ae-micro2025}, which provides a hand-written Gemmini specification.
-TensorLift captures strictly richer semantics in three areas:
+We compare ATLAAS's extracted specification against the TAIDL MICRO~2025 artifact~\cite{taidl-ae-micro2025}, which provides a hand-written Gemmini specification.
+ATLAAS captures strictly richer semantics in three areas:
 
 \begin{itemize}
 \item \textbf{Multi-bank DMA configuration.}
 The hand-written reference models each DMA load variant (\texttt{mvin\_spad}, \texttt{mvin\_acc}, etc.) with a single \texttt{@a.stride} parameter, implicitly assuming all three load engines share one configuration.
 In practice, Gemmini's LoadController maintains \emph{three independent banks}, each with its own \texttt{stride}, \texttt{scale}, \texttt{shrink}, \texttt{block\_stride}, and \texttt{pixel\_repeat} registers (5 parameters $\times$ 3 banks = 15 registers total), with the active bank selected by the \texttt{state\_id} field (\texttt{rs1[4:3]}) of the instruction encoding.
 This means the hand-written TAIDL cannot correctly simulate programs that use \texttt{mvin} and \texttt{mvin2} with different strides simultaneously---a real use case in tiled matrix multiplication where the A-tile and B-tile load from DRAM with different access patterns.
-TensorLift's per-ASV extraction sees all three banks automatically because autoGenILA traces every register independently, and the assembler groups them by their indexed base name (e.g., \texttt{strides\_0}, \texttt{strides\_1}, \texttt{strides\_2}).
+ATLAAS's per-ASV extraction sees all three banks automatically because autoGenILA traces every register independently, and the assembler groups them by their indexed base name (e.g., \texttt{strides\_0}, \texttt{strides\_1}, \texttt{strides\_2}).
 
 \item \textbf{Pooling engine semantics.}
-TensorLift extracts 12 pooling configuration registers from the StoreController (\texttt{pool\_size}, \texttt{pool\_stride}, \texttt{pool\_upad}, \texttt{pool\_lpad}, \texttt{pool\_orows}, \texttt{pool\_ocols}, etc.) and generates \texttt{reduce(max) + clamp} semantics.
+ATLAAS extracts 12 pooling configuration registers from the StoreController (\texttt{pool\_size}, \texttt{pool\_stride}, \texttt{pool\_upad}, \texttt{pool\_lpad}, \texttt{pool\_orows}, \texttt{pool\_ocols}, etc.) and generates \texttt{reduce(max) + clamp} semantics.
 The hand-written reference does not model the pooling engine.
 
 \item \textbf{Im2col hardware support.}
-TensorLift extracts 9 im2col output ports from the ExecuteController and generates \texttt{reshape + dot} semantics, capturing the hardware's ability to perform im2col transformation on-the-fly during convolution execution.
+ATLAAS extracts 9 im2col output ports from the ExecuteController and generates \texttt{reshape + dot} semantics, capturing the hardware's ability to perform im2col transformation on-the-fly during convolution execution.
 \end{itemize}
 
 We note that the hand-written reference also includes four entries---\texttt{softmax}, \texttt{GELU}, \texttt{layernorm}, and fused add-with-transpose---that are \emph{not} hardware ISA primitives.
 These are software-composed multi-instruction sequences that use the host CPU's FPU for operations such as \texttt{exp()} and \texttt{divide()}.
 No Gemmini RTL modules implement these operations.
-TensorLift correctly identifies this hardware/software boundary by extracting only instructions that correspond to actual RTL decoder entries.
+ATLAAS correctly identifies this hardware/software boundary by extracting only instructions that correspond to actual RTL decoder entries.
 
 A natural question is why we do not directly compare compiler backends generated from the two specifications.
 The reason is that the TAIDL MICRO~2025 artifact targets a \emph{functional simulator}, not a compiler backend.
 Its specification describes how individual hardware instructions move data between scratchpad and accumulator at per-tile (16$\times$16) granularity---exactly the level of detail a cycle-accurate or functional simulator needs to replay an instruction trace.
 However, a compiler backend requires a different abstraction: per-\emph{kernel} granularity that maps an entire HLO \texttt{dot} or convolution onto the hardware.
 The MICRO~2025 artifact's per-instruction patterns are too granular for ACT's instruction selection, which expects CISC-level macro-instructions (e.g., \texttt{loop\_ws} matching a whole matrix multiply, \texttt{loop\_conv\_ws} matching a whole convolution).
-TensorLift's specification provides this macro-level abstraction (Stage~3, \S\ref{subsec:stage3}), enabling ACT to generate a functional compiler backend as evaluated in the next section.
+ATLAAS's specification provides this macro-level abstraction (Stage~3, \S\ref{subsec:stage3}), enabling ACT to generate a functional compiler backend as evaluated in the next section.
 
 \subsection{End-to-End Compiler Backend Generation}
 \label{subsec:e2e}
@@ -153,7 +153,7 @@ TensorLift's specification provides this macro-level abstraction (Stage~3, \S\re
 \begin{figure}[t]
   \centering
   \includegraphics[width=\linewidth]{fig/latency_comparison.pdf}
-  \caption{Cycle-level latency comparison between hand-written Gemmini kernels and the TensorLift+ACT compiler backend on Spike. Labels show speedup (${>}\,1{\times}$ = ACT is faster).}
+  \caption{Cycle-level latency comparison between hand-written Gemmini kernels and the ATLAAS+ACT compiler backend on Spike. Labels show speedup (${>}\,1{\times}$ = ACT is faster).}
   \label{fig:latency}
 \end{figure}
 
@@ -161,13 +161,13 @@ TensorLift's specification provides this macro-level abstraction (Stage~3, \S\re
 
 \begin{table}[t]
 \centering
-\caption{Latency comparison in Spike simulator cycles. Speedup $=$ hand-written\,/\,TensorLift+ACT (${>}\,1{\times}$ = ACT is faster).}
+\caption{Latency comparison in Spike simulator cycles. Speedup $=$ hand-written\,/\,ATLAAS+ACT (${>}\,1{\times}$ = ACT is faster).}
 \label{tab:latency}
 \setlength{\tabcolsep}{3pt}
 \scriptsize
 \begin{tabular}{@{}l r r r@{}}
 \toprule
-Benchmark & Hand-written & TensorLift+ACT & Speedup \\
+Benchmark & Hand-written & ATLAAS+ACT & Speedup \\
 \midrule
 mlp3               &       1{,}501 &       1{,}433 & $1.047\times$ \\
 mlp2               &       2{,}571 &       2{,}451 & $1.049\times$ \\
@@ -182,10 +182,10 @@ mobilenet\_struct   &   3{,}408{,}414 &   3{,}408{,}581 & $1.000\times$ \\
 \end{tabular}
 \end{table}
 
-To validate that TensorLift's extracted specification is sufficient for practical use, we feed it into the ACT compiler framework~\cite{act-arxiv} to automatically generate a Gemmini compiler backend, and compare the generated code against hand-written kernels on realistic workloads.
+To validate that ATLAAS's extracted specification is sufficient for practical use, we feed it into the ACT compiler framework~\cite{act-arxiv} to automatically generate a Gemmini compiler backend, and compare the generated code against hand-written kernels on realistic workloads.
 
 \paragraph{Methodology.}
-We take TensorLift's extracted TAIDL specification and pass it to ACT, which generates an XLA-compatible compiler backend using equality saturation for instruction selection and constraint programming for scratchpad memory allocation.
+We take ATLAAS's extracted TAIDL specification and pass it to ACT, which generates an XLA-compatible compiler backend using equality saturation for instruction selection and constraint programming for scratchpad memory allocation.
 Completing the path from specification to executable binary required engineering contributions to ACT: HLO frontend support for JAX-produced operations (e.g., \texttt{convolution}, \texttt{reduce\_max}), enode-level preconditions for correct convolution dispatch, and memory allocator support for multi-layer chains.
 We then reimplement the benchmark suite from gemmini-rocc-tests~\cite{gemmini-rocc-tests}---the official bare-metal test suite provided by the Gemmini team---in JAX~\cite{jax2018github}, compiling through the ACT-generated backend.
 For each benchmark, we compare the Spike cycle count of the ACT-compiled binary against the hand-written C kernel from gemmini-rocc-tests, ensuring identical workload parameters: layer shapes, weight-stationary dataflow, activation functions, scaling, and batch sizes.
@@ -198,4 +198,4 @@ The small MLP benchmarks (mlp2, mlp3) show the ACT backend running slightly fast
 The transformer benchmark shows the only slowdown ($0.981\times$), attributable to per-tile configuration overhead in the generated instruction sequence.
 On the large workloads that dominate real deployment---ResNet-50 (49 conv layers) and MobileNet (52 layers)---the speedup is $1.000\times$.
 
-This result demonstrates that TensorLift, combined with ACT, enables a fully automated path from RTL to a functional, performance-competitive compiler backend.
+This result demonstrates that ATLAAS, combined with ACT, enables a fully automated path from RTL to a functional, performance-competitive compiler backend.

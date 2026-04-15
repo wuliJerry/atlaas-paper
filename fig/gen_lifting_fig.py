@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the MLIR lifting reduction figure for TensorLift evaluation."""
+"""Generate the MLIR lifting reduction figure for ATLAAS evaluation."""
 
 import matplotlib.pyplot as plt
 import scienceplots

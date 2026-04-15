@@ -16,21 +16,14 @@
 %% When submitting camera ready or to TAPS, please change the command
 %% to \documentclass[sigconf]{acmart}.
 %%
-\documentclass[sigconf,authordraft, anonymous]{acmart}
+\documentclass[sigconf]{acmart}
 
 \AtBeginDocument{%
   \providecommand\BibTeX{{Bib\TeX}}}
 
 %% Rights management information.
 %% Update these with your actual rights form values.
-\setcopyright{acmlicensed}
-\copyrightyear{2026}
-\acmYear{2026}
-\acmDOI{XXXXXXX.XXXXXXX}
-\acmConference[ICCAD '26]{International Conference on Computer-Aided Design}{November 8--12, 2026}{San Jose, California, USA}
-\acmISBN{978-1-4503-XXXX-X/2025/00}
-
-%% Remove the copyright statement and ACM reference block from the PDF
+\setcopyright{none}
 \settopmatter{printacmref=false}
 \renewcommand\footnotetextcopyrightpermission[1]{}
 \pagestyle{plain}
@@ -96,15 +89,47 @@
 %%
 \begin{document}
 
-\title{TensorLift: Automatic Extraction of Tensor-Level ISA Semantics from Accelerator RTL via MLIR Semantic Lifting}
+\title{ATLAAS: Automatic Tensor-Level Abstraction of Accelerator Semantics}
 
 \author{Ruijie Gao}
 \email{ruijieg@umich.edu}
 \affiliation{%
   \institution{University of Michigan}
+  \department{Computer Science \& Engineering}
   \city{Ann Arbor}
   \state{Michigan}
-  \country{United State of America}
+  \country{USA}
+}
+
+\author{Haoran Jin}
+\email{allenjin@umich.edu}
+\affiliation{%
+  \institution{University of Michigan}
+  \department{Computer Science \& Engineering}
+  \city{Ann Arbor}
+  \state{Michigan}
+  \country{USA}
+}
+
+\author{Jirong Yang}
+\authornote{This work was done while Jirong Yang was at the University of Michigan, Computer Science \& Engineering.}
+\email{polarisyjr@utexas.edu}
+\affiliation{%
+  \institution{University of Texas at Austin}
+  \department{Computer Science}
+  \city{Austin}
+  \state{Texas}
+  \country{USA}
+}
+
+\author{Nathaniel Bleier}
+\email{nbleier@umich.edu}
+\affiliation{%
+  \institution{University of Michigan}
+  \department{Computer Science \& Engineering}
+  \city{Ann Arbor}
+  \state{Michigan}
+  \country{USA}
 }
 
 \renewcommand{\shortauthors}{Gao et al.}
@@ -113,9 +138,9 @@
 
 Numerous tensor accelerator designs have been proposed in academia and industry, yet most lack well-documented ISAs and compiler backends. As a consequence, the majority of new designs are only evaluated on a handful of operators or synthetic kernels. Recent work (e.g., TAIDL and the ACT ecosystem) has shown that given a tensor-level ISA specification, complete software stacks including test oracles and compiler backends can be automatically generated. However, writing such specifications remains a manual, expert-driven process.
 
-We present TensorLift, the first end-to-end MLIR-based pipeline that lifts RTL-extracted accelerator semantics to TAIDL-like tensor ISA specifications. Building on prior architecture-level model extraction that produces bit-level LLVM IR, TensorLift introduces an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure, including MAC idioms, saturation semantics, multi-dimensional buffer organizations, and data layout transformations. The pipeline emits specifications in the TAIDL formalism, immediately enabling automatic software stack generation through the ACT ecosystem.
+We present ATLAAS, the first end-to-end MLIR-based pipeline that lifts RTL-extracted accelerator semantics to TAIDL-like tensor ISA specifications. Building on prior architecture-level model extraction that produces bit-level LLVM IR, ATLAAS introduces an 8-pass MLIR semantic lifting pipeline that progressively recovers high-level tensor structure, including MAC idioms, saturation semantics, multi-dimensional buffer organizations, and data layout transformations. The pipeline emits specifications in the TAIDL formalism, immediately enabling automatic software stack generation through the ACT ecosystem.
 
-We evaluate TensorLift on Gemmini, a systolic-array accelerator, extracting all hardware instructions semantics across 127 MLIR files. The lifting pipeline collapses the extracted bit-level MLIR by up to 92.9\% on processing elements (686 $\to$ 49 lines, of which only 17 encode the tensor computation core) and by 24--34\% on controller modules, with the residue being irreducible control logic (FSMs, address computation, and instruction muxing). TensorLift discovers hardware features omitted from the hand-written reference, including multi-bank DMA configuration, pooling engine semantics, and im2col hardware support. Correctness is validated through Z3 SMT equivalence proofs. We further confirm generality on TVM's VTA tensor processor, where the same pipeline lifts all four datapath modules without accelerator-specific changes, with extracted semantics formally verified against the underlying RTL. By feeding the extracted specification into the ACT compiler framework, TensorLift enables an automated path from RTL to a performance-competitive compiler backend, eliminating the need to manually write tensor-level ISA semantics.
+We evaluate ATLAAS on Gemmini, a systolic-array accelerator, extracting all hardware instructions semantics across 127 MLIR files. The lifting pipeline collapses the extracted bit-level MLIR by up to 92.9\% on processing elements (686 $\to$ 49 lines, of which only 17 encode the tensor computation core) and by 24--34\% on controller modules, with the residue being irreducible control logic (FSMs, address computation, and instruction muxing). ATLAAS discovers hardware features omitted from the hand-written reference, including multi-bank DMA configuration, pooling engine semantics, and im2col hardware support. Correctness is validated through Z3 SMT equivalence proofs. We further confirm generality on TVM's VTA tensor processor, where the same pipeline lifts all four datapath modules without accelerator-specific changes, with extracted semantics formally verified against the underlying RTL. By feeding the extracted specification into the ACT compiler framework, ATLAAS enables an automated path from RTL to a performance-competitive compiler backend, eliminating the need to manually write tensor-level ISA semantics.
 \end{abstract}
 
 % \begin{CCSXML}
@@ -141,12 +166,6 @@ We evaluate TensorLift on Gemmini, a systolic-array accelerator, extracting all 
 \input{sections/evaluation}
 \input{sections/related}
 \input{sections/conclusion}
-
-\begin{acks}
-% TODO: Add acknowledgments
-\end{acks}
-
-\clearpage
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
