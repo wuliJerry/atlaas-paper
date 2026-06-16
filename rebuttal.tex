@@ -1,0 +1,95 @@
+%% TensorLift --- ICCAD'26 Author Response (Rebuttal)
+%% Target: 1 page. Use \footnotesize prose if you need extra room.
+
+\documentclass[sigconf, anonymous]{acmart}
+
+%% Strip ACM front-matter / copyright that we do not need in a rebuttal.
+\settopmatter{printacmref=false, printccs=false, printfolios=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\setcopyright{none}
+\acmConference[ICCAD '26]{International Conference on Computer-Aided Design}{November 8--12, 2026}{San Jose, California, USA}
+\pagestyle{empty}
+
+\usepackage{xcolor}
+\usepackage{enumitem}
+\setlist{nosep, leftmargin=*}
+
+%% Compact spacing so we can fit the rebuttal on a single page.
+\setlength{\textfloatsep}{6pt plus 1pt minus 1pt}
+\setlength{\intextsep}{6pt plus 1pt minus 1pt}
+\setlength{\parskip}{2pt}
+
+%% Cross-reference shortcuts.
+\newcommand{\cref}[1]{(C\ref{c:#1})}
+\newcommand{\clabel}[1]{\label{c:#1}}
+
+\begin{document}
+
+%% ---------------------------------------------------------------
+%% Header.  Replace PAPER_ID with the submission number.
+%% ---------------------------------------------------------------
+\begin{center}
+{\large\bfseries Author Response --- Paper \#139}\\[2pt]
+{\itshape TensorLift: Automatic Extraction of Tensor-Level ISA Semantics from Accelerator RTL via MLIR Semantic Lifting}
+\end{center}
+
+\noindent
+We thank the reviewers for their detailed feedback. Below we address
+the recurring concerns once (\S\,Common), then provide reviewer-specific
+responses. All requested changes will be incorporated in the camera-ready.
+
+%% ===============================================================
+\section*{Common Concerns}
+%% ===============================================================
+
+\noindent\textbf{C1: \emph{TODO --- shared concern title.}}\clabel{generality}
+TODO: response addressing the concern raised by multiple reviewers
+(e.g.\ generality beyond Gemmini, scalability, comparison to baseline X).
+Keep to 4--6 lines; defer details to per-reviewer blocks.
+
+\medskip
+\noindent\textbf{C2: \emph{TODO --- shared concern title.}}\clabel{correctness}
+TODO: second shared concern (e.g.\ correctness guarantees, Z3 scope,
+manual effort to port the pipeline). 4--6 lines.
+
+%% ===============================================================
+\section*{Response to Reviewer~1}
+%% ===============================================================
+
+\noindent\textbf{R1.1 \emph{TODO --- short paraphrase of comment.}}
+TODO: response. Reference shared answers as \cref{generality}.
+
+\noindent\textbf{R1.2 \emph{TODO --- comment.}}
+TODO: response.
+
+\noindent\textbf{R1.3 \emph{TODO --- comment.}}
+TODO: response.
+
+%% ===============================================================
+\section*{Response to Reviewer~2}
+%% ===============================================================
+
+\noindent\textbf{R2.1 \emph{TODO --- comment.}}
+TODO: response.
+
+\noindent\textbf{R2.2 \emph{TODO --- comment.}}
+TODO: response. Cross-link e.g.\ \cref{correctness}.
+
+\noindent\textbf{R2.3 \emph{TODO --- comment.}}
+TODO: response.
+
+%% ===============================================================
+\section*{Response to Reviewer~3}
+%% ===============================================================
+
+\noindent\textbf{R3.1 \emph{TODO --- comment.}}
+TODO: response.
+
+\noindent\textbf{R3.2 \emph{TODO --- comment.}}
+TODO: response.
+
+\noindent\textbf{R3.3 \emph{TODO --- comment.}}
+TODO: response.
+
+
+\end{document}

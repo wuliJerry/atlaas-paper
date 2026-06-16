@@ -19,7 +19,7 @@
 *xcp
 
 # Generated PDF (keep source, not output)
-main.pdf
+*.pdf
 
 # Editor/IDE files
 *.swp
