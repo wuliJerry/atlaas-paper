@@ -1,0 +1,92 @@
+IEEE/ACM ICCAD 2026 Paper #139 Reviews and Comments
+===========================================================================
+Paper #139 TensorLift: Automatic Extraction of Tensor-Level ISA Semantics
+from Accelerator RTL via MLIR Semantic Lifting
+
+
+Review #139A
+===========================================================================
+
+Paper summary (3-4 sentences)
+-----------------------------
+TensorLift is an end-to-end pipeline that lifts RTL-extracted, bit-level accelerator semantics (produced by an autoGenILA-style symbolic extractor) into TAIDL-like tensor-level ISA specifications through an 8-pass MLIR semantic-lifting pipeline (bit-manipulation canonicalization, idiom detection, loop reconstruction, metadata emission). It is evaluated on Gemmini and VTA, achieving up to 92.9% line reduction on compute-dominated modules, recovering features absent from the hand-written reference (multi-bank DMA, pooling, im2col), formally verifying lifted semantics against the scalar model via Z3, and feeding the result into ACT to generate a compiler backend that is roughly on par (1.014x geomean) with hand-written kernels.
+
+Strengths
+---------
+(1) Clearly identified and well-positioned gap. Figure 1 cleanly frames the missing automated path between bottom-up ILA extraction (scalar models) and top-down ACT (assumes hand-written TAIDL). This is a genuine bottleneck and the framing is convincing.
+(2) The 8-pass pipeline is principled and well documented (Table 2), and the “annotate, don’t rewrite, fall back to opaque on no match” design is a sensible robustness choice.
+(3) Strong correctness story: Z3 bit-vector equivalence over the full 2^60 PE input space, transitively grounded on autoGenILA’s by-construction RTL equivalence.
+(4) The discovery of features missing from the hand-written TAIDL reference (multi-bank DMA banks, pooling engine, im2col) is the most compelling evidence that the method adds real value over manual specification.
+(5) End-to-end demonstration through ACT to an executable, performance-competitive backend, plus generalization to a second accelerator (VTA) without pipeline changes
+
+Weaknesses
+----------
+(1)	Generality is demonstrated on only two accelerators, both fairly conventional GEMM/systolic designs. The structural cues the pipeline relies on (sign-extension chains, MAC fan-in, clamp idioms, accumulator def-use chains) are plausibly common, but the paper does not show behavior on reconfigurable-interconnect (MAERI/SIGMA) or sparse accelerators, where these idioms may not hold.
+(2)	The headline 92.9% reduction is specific to the PE; overall reduction is 26.2%, and control-heavy modules barely compress (13.6–33.5%). This is reported honestly, but the abstract/title emphasis risks overstating the typical case.
+(3)	1.014x geomean is essentially parity. The real contribution is automation/correctness, not speed; the performance framing should avoid implying a perf win.
+(4)	No reported runtime/scalability for the lifting pipeline itself. The ExecuteController alone is ~998K lines across 80 files; symbolic unrolling and lifting cost (and how it scales with cycle bound / design size) is not quantified.
+(5)	Verification covers lifting (lifted ≡ scalar model). Stage 3 assembly — HLO templating, CISC macro composition, and FSM ordering recovery — appears heuristic and is not formally verified; its correctness guarantees are weaker than the rest of the pipeline.
+(6)	The fraction of instructions that lift fully vs. fall back to opaque semantics on the evaluated designs is not reported, which matters for assessing practical completeness
+
+Comments for authors
+--------------------
+This is a solid, well-motivated paper that I would like to see accepted if a few gaps are addressed. Please quantify (a) lifting-pipeline wall-clock cost and how it scales, (b) the fraction of opaque/partial lifts per module, and (c) what correctness guarantee, if any, applies to the Stage-3 macro/FSM recovery. A short discussion of expected behavior on a non-systolic accelerator class would substantially strengthen the generality claim even without a full third case study.
+Comments for PCA strong, well-motivated contribution with a clear problem statement and a rigorous verification methodology. The weaknesses concern scope and scalability evidence rather than soundness. Recommend acceptance contingent on a credible rebuttal regarding generality and pipeline runtime.
+
+Rebuttal questions for authors
+------------------------------
+1.	What is the end-to-end lifting time for the largest module (e.g., Gemmini ExecuteController, ~998K lines), and how does it scale with design size / unroll cycle bound?
+2.	Across all instructions on Gemmini and VTA, what fraction lift to full tensor-level semantics vs. fall back to opaque, and what causes the failures?
+3.	Is any correctness guarantee provided for Stage-3 TAIDL assembly (HLO templating, CISC macro composition, FSM ordering), or is only the Stage-2 lifting verified?
+
+
+
+Review #139B
+===========================================================================
+
+Paper summary (3-4 sentences)
+-----------------------------
+This paper introduces TensorLift, an end-to-end MLIR-based pipeline designed to automatically extract tensor-level ISA semantics from accelerator RTL. The problem it addresses is the manual, expert-driven process of writing ISA specifications for tensor accelerators, which hinders automated software stack generation. TensorLift employs an 8-pass MLIR semantic lifting pipeline to progressively recover high-level tensor structures from bit-level MLIR, bridging the abstraction gap between hardware and tensor-level semantics. The key results include significant code reduction (up to 92.9%) on compute-dominated modules and formal verification of lifted semantics against the underlying RTL, enabling automated compiler backend generation with competitive performance.
+
+Strengths
+---------
+The primary strength of this paper lies in its systematic approach to automating the extraction of tensor-level ISA semantics from RTL, addressing a critical bottleneck in accelerator software stack development. The formal verification of the lifted semantics provides strong evidence of correctness and reliability. This work significantly contributes to reducing the manual effort required for accelerator programming. The use of MLIR as an intermediate representation is a sound choice, leveraging its extensibility and multi-level abstraction capabilities.
+
+Weaknesses
+----------
+Limited performance gain demonstrated by the automatically generated backend over hand-written kernels, with only a 1.014x geometric mean speedup and even a slowdown in one case. This suggests that while functional correctness is achieved, the generated code is not substantially more optimized than manual efforts. The evaluation also lacks a comprehensive analysis of the computational cost and time required for the TensorLift pipeline to process large and complex RTL designs, which is crucial for assessing its practical applicability in real-world scenarios. Furthermore, the paper could benefit from a more critical discussion of the limitations of its approach and potential failure cases.
+
+Rebuttal questions for authors
+------------------------------
+1. How does TensorLift handle RTL designs with highly irregular or dynamic control flow that don't map cleanly to tensor operations?
+2. What is the compilation time overhead compared to traditional verification flows?
+
+
+
+Review #139C
+===========================================================================
+
+Paper summary (3-4 sentences)
+-----------------------------
+This paper proposes TensorLift, an MLIR-based semantic lifting framework that automatically extracts tensor-level ISA semantics from RTL designs and emits TAIDL-compatible specifications for downstream compiler generation. The paper addresses an important bottleneck in accelerator software tooling: the lack of machine-readable tensor ISA specifications for most open-source accelerators. The proposed pipeline is evaluated on Gemmini and VTA with formal verification and compiler integration.
+
+Strengths
+---------
+The paper identifies a real bottleneck in tensor accelerator deployment.
+The proposed semantic lifting pipeline is technically sophisticated and reasonably novel.
+
+Weaknesses
+----------
+The evaluation breadth is limited that the paper only evaluates on Gemmini and VTA.
+The paper does not sufficiently analyze and discussion for limitation and failure of the lifting.
+
+Comments for authors
+--------------------
+The paper addresses an important problem in tensor accelerator deployment: many accelerators have RTL implementations but lack precise, machine-readable ISA semantics and compiler backends, which limit their usability beyond hand-written kernels. The proposed TensorLift pipeline is technically sound, as it attempts to bridge RTL-level extraction and tensor-level ISA specification through an MLIR-based semantic lifting flow.
+
+The paper would be stronger with a discussion of TensorLift’s limitations and robustness. In particular, the current evaluation demonstrates successful lifting on Gemmini and VTA but does not fully explain how the pipeline behaves when RTL does not match the expected idioms, such as recognizable MAC chains, clamp patterns, or accumulator def-use structures. Since the lifting passes relies on structural patterns in the extracted MLIR, it would be useful to report coverage statistics, examples of failed or partially lifted instructions, false-positive safeguards, and the amount of human effort required when the system falls back to opaque semantics. The generality claim would also be more convincing if the evaluation included a more diverse accelerator design or a stress test involving synthesis-optimized, control-heavy, or irregular tensor hardware.
+
+Rebuttal questions for authors
+------------------------------
+1. Can the authors explain why these two accelerators are sufficient to demonstrate the generality of TensorLift, and whether the method has been tested on more diverse, control-heavy, or synthesis-optimized tensor accelerators?
+2. Can the authors provide more details about failure cases or partially lifted instruction

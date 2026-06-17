@@ -12,6 +12,7 @@
 
 \usepackage{xcolor}
 \usepackage{enumitem}
+\usepackage{booktabs}
 \setlist{nosep, leftmargin=*}
 
 %% Compact spacing so we can fit the rebuttal on a single page.
@@ -19,14 +20,20 @@
 \setlength{\intextsep}{6pt plus 1pt minus 1pt}
 \setlength{\parskip}{2pt}
 
-%% Cross-reference shortcuts.
-\newcommand{\cref}[1]{(C\ref{c:#1})}
-\newcommand{\clabel}[1]{\label{c:#1}}
+%% Cross-reference shortcuts.  Hardcoded mapping so that re-ordering items
+%% only requires touching this table.
+\makeatletter
+\newcommand{\cref}[1]{(C\csname tlr@@#1\endcsname)}
+\newcommand{\clabel}[1]{} % visual labels are the bold "C1:"/"C2:" prefixes
+\@namedef{tlr@@generality}{1}
+\@namedef{tlr@@coverage}{2}
+\@namedef{tlr@@perf}{3}
+\makeatother
 
 \begin{document}
 
 %% ---------------------------------------------------------------
-%% Header.  Replace PAPER_ID with the submission number.
+%% Header.
 %% ---------------------------------------------------------------
 \begin{center}
 {\large\bfseries Author Response --- Paper \#139}\\[2pt]
@@ -42,54 +49,222 @@ responses. All requested changes will be incorporated in the camera-ready.
 \section*{Common Concerns}
 %% ===============================================================
 
-\noindent\textbf{C1: \emph{TODO --- shared concern title.}}\clabel{generality}
-TODO: response addressing the concern raised by multiple reviewers
-(e.g.\ generality beyond Gemmini, scalability, comparison to baseline X).
-Keep to 4--6 lines; defer details to per-reviewer blocks.
+\noindent\textbf{C1: \emph{Generality beyond Gemmini and VTA, including irregular control flow.}}\clabel{generality}
+In response to the reviewers' generality concern, we additionally applied
+the unmodified pipeline to \textbf{FEATHER (ISCA'24)}---a reconfigurable
+spatial array with a BIRRD Benes-network reducer, architecturally opposite
+to a systolic mesh. The lift recovers FEATHER's hand-designed ISA~2.0 (the
+authors' \texttt{minisa}) almost instruction-for-instruction and in fact
+recovers \emph{fused} micro-ops (\texttt{SetIVN\_OVNLayout},
+\texttt{Load\_ExecuteStreaming\_addr}, \texttt{ExecuteMapping} subsuming
+the WVN load) that the hand-written ISA splits. The extracted spec drives a
+real ACT-generated backend that compiles FEATHER's entire 50-workload
+evaluation suite end-to-end. Holding tiling fixed to \texttt{minisa}'s own
+\texttt{choose\_tile\_sizes}, the lifted ISA needs geomean $1.27\times$
+(up to $1.43\times$) fewer instructions---largest savings on the flagship
+FHE-bootstrapping and ZKP kernels, parity on large compute-bound matmuls;
+the gap grows with array size ($1.10\times$ at $4{\times}4$ $\to$
+$1.27\times$ at $16{\times}16$), never a regression. We will add this as a
+third camera-ready case study, including the per-instruction coverage and
+workload-level instruction-count results. Generality comes from structural
+cues---sign-extension chains, MAC fan-in, clamp idioms, accumulator
+def--use chains---that are RTL-synthesis patterns rather than
+systolic-specific.
 
 \medskip
-\noindent\textbf{C2: \emph{TODO --- shared concern title.}}\clabel{correctness}
-TODO: second shared concern (e.g.\ correctness guarantees, Z3 scope,
-manual effort to port the pipeline). 4--6 lines.
+\noindent\textbf{C2: \emph{Per-instruction coverage and classification of partially lifted cases.}}\clabel{coverage}
+We instrumented every \texttt{tensorlift-opt} pass and the TAIDL assembler to
+record, for each of the 23 hardware instructions across Gemmini, VTA, and
+FEATHER (\cref{generality}), which \emph{Stage-3 assembly path} the lifted
+MLIR follows: a \emph{full} tensor template (\texttt{compute} or
+\texttt{DMA}), a \emph{partial} body in which correct data-path semantics
+are present in the lifted MLIR but no existing whole-tensor template
+matches, or an \emph{opaque} control-only fallback. Thus this table measures
+template coverage, not whether Stage~2 successfully extracted the
+instruction semantics.
+Across the three accelerators:
+
+\smallskip
+\noindent\begin{minipage}{\linewidth}\centering\scriptsize
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Accelerator & Full & Partial & Opaque & Instructions \\
+\midrule
+Gemmini (HW instrs)   & 6 & 1 & 4 & 11 \\
+VTA                   & 0 & 3 & 1 & 4  \\
+FEATHER (MINISA)      & 3 & 1 & 4 & 8  \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\smallskip
+
+\noindent
+Every residual maps to one of six causes: FSM/config-register state machine;
+operand data-staging into PE registers; adder-tree MAC fan-in; opcode-mux
+decoder dispatch; DMA-command / address generation; and reconfigurable
+reduction-network routing. \textbf{Opaque is a correctness-preserving
+fallback by construction}: when no template matches, the assembler emits a
+control-only body rather than incorrect TAIDL, so the assembler avoids
+fabricating tensor semantics when a template does not apply. In particular,
+VTA's \texttt{TensorGemm} semantics align with the documented ISA, but its
+adder-tree fan-in does not match the current Gemmini-style
+\texttt{dot\_product} template, so it is classified as \emph{partial} in
+this table. The camera-ready will include the full table with the
+per-instruction cause column.
+
+\medskip
+\noindent\textbf{C3: \emph{Performance framing --- the role of discovered features.}}\clabel{perf}
+We agree with Reviewers A and B that the paper's $1.014\times$ geomean
+on standard MLP/ResNet/MobileNet workloads is essentially parity; the
+value of the extracted spec is automation and correctness, not a generic
+speedup. To make the discovered-features story concrete (Reviewer A's
+Strength~4), we ran a \textbf{feature-ablation} experiment: two
+ACT-generated backends differing only by the StoreController
+\textbf{pooling instruction}---a feature discovered by TensorLift but
+absent from the hand-written reference. This is not a claim of generic
+speedup; it isolates the benefit of exposing a real hardware feature to
+the compiler. Fed an identical conv\,$\to$\,2$\times$2-maxpool graph, the
+pooling-aware spec compiles to a single fused \texttt{LOOP\_CONV\_WS} with
+pooling; the pooling-unaware spec is forced into hardware convolution plus
+a host-CPU max-pool pass:
+
+\smallskip
+\noindent\begin{minipage}{\linewidth}\centering\scriptsize
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+conv$\to$pool shape & w/o pool (cyc) & w/ pool (cyc) & speedup \\
+\midrule
+$16{\times}16{\times}32$  &  62{,}224 & 22{,}224 & $2.8\times$  \\
+$24{\times}24{\times}48$  & 238{,}942 & 32{,}472 & $7.4\times$  \\
+$32{\times}32{\times}32$  & 260{,}743 & 22{,}310 & $11.7\times$ \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\smallskip
+
+\noindent
+Output is bit-identical in every case. ACT performs no implicit software
+fallback---the CPU pass appears only because the un-fused pool must be
+covered by \emph{some} instruction in the ablated spec, so modeling the
+discovered hardware feature is what drives the speedup. Thus the main
+end-to-end result remains parity on standard workloads, while discovered
+features translate to substantial wins when workloads specifically
+exercise them.
 
 %% ===============================================================
-\section*{Response to Reviewer~1}
+\section*{Response to Reviewer~A}
 %% ===============================================================
 
-\noindent\textbf{R1.1 \emph{TODO --- short paraphrase of comment.}}
-TODO: response. Reference shared answers as \cref{generality}.
+\noindent\textbf{R-A.1 \emph{End-to-end lifting time on the largest module and scaling with design size / unroll bound.}}
+At Gemmini DIM=16, wall-clock per module is PE 1.3\,s, LoadController
+6.5\,s, StoreController 7.2\,s, and \textbf{ExecuteController
+$\approx$5250\,s} (flatten 48\,s; extract 4540\,s; lift 619\,s; assemble
+43\,s; Z3 25\,ms). Sweeping DIM~$\in\{4,8,16,32\}$ on the
+ExecuteController (all times CPU-s, sequential-equivalent; DIM=32 ran
+sharded across 32 cores):
 
-\noindent\textbf{R1.2 \emph{TODO --- comment.}}
-TODO: response.
+\smallskip
+\noindent\begin{minipage}{\linewidth}\centering\scriptsize
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+DIM & PEs & Extract (CPU-s) & Lift (CPU-s) & Z3 (ms) & TAIDL lines \\
+\midrule
+ 4 &   16 &       29   &     4.5 & 25.4 & 40 \\
+ 8 &   64 &      231   &      42 & 26.2 & 40 \\
+16 &  256 &   4{,}540  &     619 & 25.4 & 41 \\
+32 & 1024 & 201{,}062  & 7{,}820 & 25.4 & 41 \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\smallskip
 
-\noindent\textbf{R1.3 \emph{TODO --- comment.}}
-TODO: response.
+\noindent
+Per-PE extraction grows super-linearly
+($1.8\!\to\!3.6\!\to\!17.7\!\to\!196$\,s/PE) because the dependency cone
+deepens with unroll depth $2\!\cdot\!\text{DIM}+4$. Two invariants stay
+flat: the assembled TAIDL spec stays $\approx$41 lines at every DIM
+(\texttt{TILE\_DIM} auto-inferred), and the Z3 MAC proof stays at
+$\approx$25\,ms over all $2^{60}$ inputs---one per-PE proof certifies
+all DIM$^2$ PEs by systolic homogeneity, so verification is O(1) in
+DIM. Extraction and lift are embarrassingly parallel: sharding DIM=32's
+1024 PEs across 32 cores cuts wall-clock to 1.9\,h.
+
+\noindent\textbf{R-A.2 \emph{Fraction of instructions that lift to full tensor semantics vs.\ opaque, with failure causes.}}
+See \cref{coverage}. For Gemmini specifically, the two systolic compute
+instructions (\texttt{compute\_preloaded}, \texttt{compute\_accumulated})
+and the four DMA instructions (\texttt{mvin}/\texttt{mvin2}/\texttt{mvin3},
+\texttt{mvout}) reach full templates; \texttt{preload} is operand staging
+(partial); the four \texttt{config\_*} opcodes are FSM-only by
+construction (opaque).
+
+\noindent\textbf{R-A.3 \emph{Correctness guarantees for Stage-3 TAIDL assembly.}}
+Stage-3 assembly is not independently SMT-proven end-to-end; the formal
+proofs in the paper establish equivalence between Stage-2 lifted MLIR and
+the scalar RTL-extracted model. Stage-3's correctness risk is bounded by
+three mechanisms: (i) \textbf{HLO templating} is a fixed, audited mapping
+from a closed set of Stage-2 annotations to HLO operations
+(\texttt{dot\_product}~$\to$ \texttt{convert+dot+add}, with optional
+\texttt{clamp}; \texttt{pool} $\to$ \texttt{reduce(max)};
+\texttt{im2col\_matmul}~$\to$ \texttt{reshape+dot+add}); the templates
+contain no instruction-specific logic. (ii) \textbf{CISC macro
+composition} (e.g., \texttt{loop\_ws}, \texttt{loop\_conv\_ws}) reuses
+per-primitive semantics already proven Z3-equivalent to RTL in Stage-2;
+the macro body is the same primitive op iterated over loop bounds
+recovered from the controller's RTL. (iii) \textbf{FSM ordering} (e.g.,
+\texttt{compute\_preloaded} may only fire after \texttt{preload}) is
+\emph{recovered} from RTL transition relations, not synthesized: each
+ordering edge corresponds to an actual control-state update in the RTL.
+The camera-ready will add a worked example tying each of (i)--(iii) to
+the corresponding RTL evidence.
 
 %% ===============================================================
-\section*{Response to Reviewer~2}
+\section*{Response to Reviewer~B}
 %% ===============================================================
 
-\noindent\textbf{R2.1 \emph{TODO --- comment.}}
-TODO: response.
+\noindent\textbf{R-B.1 \emph{Handling RTL with highly irregular or dynamic control flow.}}
+See \cref{generality} for FEATHER, whose BIRRD reconfigurable reduction
+network is the concrete instance. Conceptually, the contract is that the
+pipeline \emph{never attempts to mis-lift}: when control flow does not
+match a tensor template the instruction falls into the partial or opaque
+category of \cref{coverage}, where its bit-level semantics are preserved
+verbatim. The cause taxonomy is small (six causes) and predictable, and
+covers every residual we observed across the three accelerators.
 
-\noindent\textbf{R2.2 \emph{TODO --- comment.}}
-TODO: response. Cross-link e.g.\ \cref{correctness}.
-
-\noindent\textbf{R2.3 \emph{TODO --- comment.}}
-TODO: response.
+\noindent\textbf{R-B.2 \emph{Compilation-time overhead compared to traditional verification flows.}}
+TensorLift is a \textbf{one-time spec-extraction cost}, not a per-compile
+overhead. The dominant cost is autoGenILA extraction (4540\,s on Gemmini's
+ExecuteController at DIM=16), paid once per accelerator; downstream lift
+(619\,s), assembly (43\,s), and Z3 ($\approx$25\,ms) reuse the
+extracted MLIR for every subsequent compile. This replaces manual TAIDL
+authoring---an expert-weeks effort that motivated this work and that
+traditional formal-verification flows do not produce. Verification cost is
+flat in DIM (a single per-PE MAC proof certifies the whole systolic
+mesh), so it does not scale with design size.
 
 %% ===============================================================
-\section*{Response to Reviewer~3}
+\section*{Response to Reviewer~C}
 %% ===============================================================
 
-\noindent\textbf{R3.1 \emph{TODO --- comment.}}
-TODO: response.
+\noindent\textbf{R-C.1 \emph{Why two accelerators suffice; results on more diverse, control-heavy, or synthesis-optimized designs.}}
+See \cref{generality}. FEATHER is the concrete instance and is
+architecturally diverse from Gemmini: spatial array $+$ reconfigurable
+BIRRD reducer, not a systolic mesh. The lift recovers its per-PE MAC,
+activation/requantize, and partial-sum store fully; the BIRRD switch's
+reduction is recovered (only its routing remains opaque); the four
+layout/addressing opcodes are FSM-only by construction. The pipeline runs
+on FEATHER without any accelerator-specific changes, providing direct
+evidence that the structural cues used for lifting generalize beyond
+systolic GEMM engines.
 
-\noindent\textbf{R3.2 \emph{TODO --- comment.}}
-TODO: response.
-
-\noindent\textbf{R3.3 \emph{TODO --- comment.}}
-TODO: response.
-
+\noindent\textbf{R-C.2 \emph{More details on failure cases and partially lifted instructions.}}
+See \cref{coverage} for the per-instruction taxonomy across all 23
+instructions on Gemmini, VTA, and FEATHER, with every residual mapped to
+one of six causes. This taxonomy is a Stage-3 template-coverage
+classification: for example, VTA's GEMM semantics are extracted and
+spec-aligned, but remain \emph{partial} because the adder-tree fan-in does
+not yet collapse to the existing \texttt{dot\_product} template. Opaque is
+a conservative fallback, not a silent failure. The complement---the
+practical value of the
+\emph{fully} lifted and \emph{discovered} features---is in \cref{perf}.
 
 \end{document}
