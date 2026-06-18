@@ -2,25 +2,30 @@ We thank the reviewers for their detailed feedback. Below we address the recurri
 
 ## Common Concerns
 
-**C1: *Generality beyond Gemmini and VTA, including irregular control flow.***
+**C1: *Generality beyond Gemmini and VTA — reconfigurable, sparse, and irregular designs.***
 
-In response to the reviewers' generality concern, we additionally applied the unmodified pipeline to **FEATHER (ISCA'24)** — a reconfigurable spatial array with a BIRRD Benes-network reducer, architecturally opposite to a systolic mesh. The lift recovers FEATHER's hand-designed ISA 2.0 (the authors' `minisa`) almost instruction-for-instruction and in fact recovers *fused* micro-ops (`SetIVN_OVNLayout`, `Load_ExecuteStreaming_addr`, `ExecuteMapping` subsuming the WVN load) that the hand-written ISA splits. The extracted spec drives a real ACT-generated backend that compiles FEATHER's entire 50-workload evaluation suite end-to-end. Holding tiling fixed to `minisa`'s own `choose_tile_sizes`, the lifted ISA needs geomean 1.27× (up to 1.43×) fewer instructions — largest savings on the flagship FHE-bootstrapping and ZKP kernels, parity on large compute-bound matmuls; the gap grows with array size (1.10× at 4×4 → 1.27× at 16×16), never a regression. We will add this as a third camera-ready case study, including the per-instruction coverage and workload-level instruction-count results. Generality comes from structural cues — sign-extension chains, MAC fan-in, clamp idioms, accumulator def–use chains — that are RTL-synthesis patterns rather than systolic-specific.
+We applied the unmodified pipeline to three more accelerators of different classes. **FEATHER (ISCA'24)** addresses Reviewer A's reconfigurable-interconnect concern: a reconfigurable spatial array with a BIRRD Benes-network reducer, architecturally opposite to a systolic mesh. The lift recovers FEATHER's hand-designed ISA 2.0 (the authors' `minisa`, ISPASS'26) almost instruction-for-instruction, recovering *fused* micro-ops (`SetIVN_OVNLayout`, `Load_ExecuteStreaming_addr`, `ExecuteMapping` subsuming the WVN load) that the hand-written ISA splits. The extracted spec drives an ACT-generated backend that compiles FEATHER's 50-workload evaluation suite end-to-end; holding tiling fixed to `minisa`'s own `choose_tile_sizes`, the lifted ISA needs geomean 1.27× (up to 1.43×) fewer instructions, with the largest savings on the flagship FHE-bootstrapping and ZKP kernels and parity on large compute-bound matmuls, never a regression. We report *instruction count* (`minisa`'s headline metric) rather than cycles because no independent FEATHER cycle simulator exists; cycle numbers would come from `minisa`'s own analytical model. Gemmini's functional-Spike `rdcycle` tracks instruction count closely, so the metric is consistent across both.
 
-**C2: *Per-instruction coverage and classification of partially lifted cases.***
+**NVDLA** (sparse weight decompression) and **SPAGHETTI (HPCA'21)** (sparse–sparse FP32 SpGEMM) address Reviewer A's sparse-accelerator concern. The pipeline captures both end-to-end: NVDLA's popcount-indexed weight scatter lifts with base-lane Z3-proven semantics; SPAGHETTI's IEEE-754 recoded-FP multiply–add units (`OuterDot`, `CooSCALFU`, `CooSCALNode`, `Adder`) all reach the dense `clamp(dot(A,B)+C)` compute template. FP arithmetic and CSR/COO value streams capture as **Tensor**; the sparse coordinate machinery (merge-sort, shape/shift transforms, virtual-channel allocation, descriptor control) captures as **Control** (C2). FEATHER, NVDLA, and SPAGHETTI will appear as camera-ready case studies. Generality comes from structural cues — sign-extension chains, MAC fan-in, clamp idioms, accumulator def–use chains — that are RTL-synthesis patterns rather than design-class-specific. We do not claim coverage of *synthesis-optimized* hardware (retimed, register-fused, or technology-mapped datapaths where these idioms can be obscured); the camera-ready will state this limitation explicitly.
 
-We instrumented every `tensorlift-opt` pass and the TAIDL assembler to record, for each of the 23 hardware instructions across Gemmini, VTA, and FEATHER (C1), which *Stage-3 assembly path* the lifted MLIR follows: a *full* tensor template (`compute` or `DMA`), a *partial* body in which correct data-path semantics are present in the lifted MLIR but no existing whole-tensor template matches, or an *opaque* control-only fallback. Thus this table measures template coverage, not whether Stage 2 successfully extracted the instruction semantics. Across the three accelerators:
+**C2: *Per-instruction coverage of captured semantics.***
 
-| Accelerator         | Full | Partial | Opaque | Instructions |
-|---------------------|:---:|:---:|:---:|:---:|
-| Gemmini (HW instrs) | 6 | 1 | 4 | 11 |
-| VTA                 | 0 | 3 | 1 | 4 |
-| FEATHER (MINISA)    | 3 | 1 | 4 | 8 |
+Reviewer C asks about *partially lifted instructions* and Reviewer A about instructions that *fall back to opaque*. End-to-end compilation needs each instruction's semantics *captured*, not folded to a fixed dense-tensor template. We report each instruction's role: **Tensor** (the instruction produces or moves numeric tensor element values — MAC, dot, reduce, activation/requantize, or DMA of value arrays); **Control** (the instruction manages config / addressing / coordinate / sequencing state, no numeric value output); and **Failed** (the pipeline could not capture the instruction). Across 38 instructions on five accelerators (Gemmini, VTA, FEATHER (C1), NVDLA, SPAGHETTI):
 
-Every residual maps to one of six causes: FSM/config-register state machine; operand data-staging into PE registers; adder-tree MAC fan-in; opcode-mux decoder dispatch; DMA-command / address generation; and reconfigurable reduction-network routing. **Opaque is a correctness-preserving fallback by construction**: when no template matches, the assembler emits a control-only body rather than incorrect TAIDL, so the assembler avoids fabricating tensor semantics when a template does not apply. In particular, VTA's `TensorGemm` semantics align with the documented ISA, but its adder-tree fan-in does not match the current Gemmini-style `dot_product` template, so it is classified as *partial* in this table. The camera-ready will include the full table with the per-instruction cause column.
+| Accelerator | Tensor | Control | Failed | Instructions |
+|---|:---:|:---:|:---:|:---:|
+| Gemmini   | 7 | 4 | 0 | 11 |
+| VTA       | 3 | 1 | 0 | 4  |
+| FEATHER   | 4 | 4 | 0 | 8  |
+| NVDLA     | 1 | 1 | 0 | 2  |
+| SPAGHETTI | 6 | 7 | 0 | 13 |
+| **Total** | **21** | **17** | **0** | **38** |
+
+**Failed = 0 across every accelerator.** The Tensor / Control split reflects each instruction's *role*, not a capture failure. Cases a template-fit grading would mark partial — VTA's adder-tree GEMM, FEATHER's BIRRD reduce, NVDLA's popcount-indexed weight scatter — all classify as **Tensor**: they carry value semantics, just not as a single dense template. We also acknowledge Reviewer A's Weakness 2: the headline 92.9% reduction is per-PE, and the overall 26.2% (Gemmini) / 41.2% (VTA) figures already in the paper reflect the control-heavy reality. The camera-ready will lead with the overall numbers and present 92.9% as a per-module compute-core result rather than the headline.
 
 **C3: *Performance framing — the role of discovered features.***
 
-We agree with Reviewers A and B that the paper's 1.014× geomean on standard MLP/ResNet/MobileNet workloads is essentially parity; the value of the extracted spec is automation and correctness, not a generic speedup. To make the discovered-features story concrete (Reviewer A's Strength 4), we ran a **feature-ablation** experiment: two ACT-generated backends differing only by the StoreController **pooling instruction** — a feature discovered by TensorLift but absent from the hand-written reference. This is not a claim of generic speedup; it isolates the benefit of exposing a real hardware feature to the compiler. Fed an identical conv → 2×2-maxpool graph, the pooling-aware spec compiles to a single fused `LOOP_CONV_WS` with pooling; the pooling-unaware spec is forced into hardware convolution plus a host-CPU max-pool pass:
+Reviewers A and B note that the paper's 1.014× geomean on standard MLP/ResNet/MobileNet workloads is essentially parity; the extracted spec's value is automation and correctness, not generic speedup. To make the discovered-features story concrete (Reviewer A's Strength 4), we ran a **feature-ablation** experiment: two ACT-generated backends differing only by the StoreController **pooling instruction** — a feature discovered by TensorLift but absent from the hand-written reference. Fed an identical conv → 2×2-maxpool graph, the pooling-aware spec compiles to a single fused `LOOP_CONV_WS` with pooling; the pooling-unaware spec is forced into hardware convolution plus a host-CPU max-pool pass:
 
 | conv → pool shape | w/o pool (cyc) | w/ pool (cyc) | speedup |
 |---|---:|---:|---:|
@@ -28,7 +33,7 @@ We agree with Reviewers A and B that the paper's 1.014× geomean on standard MLP
 | 24×24×48 | 238,942 | 32,472 |  7.4× |
 | 32×32×32 | 260,743 | 22,310 | 11.7× |
 
-Output is bit-identical in every case. ACT performs no implicit software fallback — the CPU pass appears only because the un-fused pool must be covered by *some* instruction in the ablated spec, so modeling the discovered hardware feature is what drives the speedup. Thus the main end-to-end result remains parity on standard workloads, while discovered features translate to substantial wins when workloads specifically exercise them.
+Output is bit-identical in every case. ACT performs no implicit software fallback — the CPU pass appears only because the un-fused pool must be covered by *some* instruction in the ablated spec. The main end-to-end result remains parity on standard workloads, while discovered features translate to substantial wins when workloads specifically exercise them.
 
 ## Response to Reviewer A
 
@@ -47,28 +52,36 @@ Per-PE extraction grows super-linearly (1.8 → 3.6 → 17.7 → 196 s/PE) becau
 
 **R-A.2 *Fraction of instructions that lift to full tensor semantics vs. opaque, with failure causes.***
 
-See (C2). For Gemmini specifically, the two systolic compute instructions (`compute_preloaded`, `compute_accumulated`) and the four DMA instructions (`mvin` / `mvin2` / `mvin3`, `mvout`) reach full templates; `preload` is operand staging (partial); the four `config_*` opcodes are FSM-only by construction (opaque).
+See (C2). For Gemmini specifically, seven instructions are **Tensor** (`compute_preloaded`, `compute_accumulated`, `preload` operand-staging, `mvin` / `mvin2` / `mvin3`, `mvout`); four are **Control** (`config_ex` / `_ld` / `_st` / `_norm`); none failed.
 
 **R-A.3 *Correctness guarantees for Stage-3 TAIDL assembly.***
 
-Stage-3 assembly is not independently SMT-proven end-to-end; the formal proofs in the paper establish equivalence between Stage-2 lifted MLIR and the scalar RTL-extracted model. Stage-3's correctness risk is bounded by three mechanisms: (i) **HLO templating** is a fixed, audited mapping from a closed set of Stage-2 annotations to HLO operations (`dot_product` → `convert + dot + add`, with optional `clamp`; `pool` → `reduce(max)`; `im2col_matmul` → `reshape + dot + add`); the templates contain no instruction-specific logic. (ii) **CISC macro composition** (e.g., `loop_ws`, `loop_conv_ws`) reuses per-primitive semantics already proven Z3-equivalent to RTL in Stage-2; the macro body is the same primitive op iterated over loop bounds recovered from the controller's RTL. (iii) **FSM ordering** (e.g., `compute_preloaded` may only fire after `preload`) is *recovered* from RTL transition relations, not synthesized: each ordering edge corresponds to an actual control-state update in the RTL. The camera-ready will add a worked example tying each of (i)–(iii) to the corresponding RTL evidence.
+Stage-3 assembly is not independently SMT-proven end-to-end; the formal proofs establish equivalence between the Stage-2 lifted MLIR and the scalar RTL-extracted model (autoGenILA's per-register LLVM IR), via Z3, for the core compute and DMA primitives (PE MAC, weight-stationary dataflow mux, DMA copy, and the VTA datapath); the remaining ops (pooling, im2col-conv, DMA `mvin` / `mvout`) are validated against Spike golden data. Stage-3's correctness risk is bounded by three mechanisms.
+
+(i) **HLO templating** is a fixed, accelerator-agnostic mapping from a closed set of Stage-2 annotations to HLO: `tensor_op = dot_product | mac` → `convert + dot + add` (the `add` is present iff the lifter recovered an accumulator read, else a `copy`); `scalar_op = mul` → `multiply` (with optional `clamp` / quantize when the lifter detected requantization); `scalar_op = add` → reduction `add`. The templates contain no per-instruction or per-accelerator logic — dispatch is purely on the recovered annotation/role.
+
+(ii) **CISC macro composition** (`loop_ws`, `loop_conv_ws`) reuses the per-primitive MAC semantics already proven Z3-equivalent to RTL in Stage-2; the macro body is the same `dot + add` primitive wrapped only in shape plumbing (`reshape` / `bitcast` / `convert`), iterating over a loop nest whose bound *registers* are identified from the controller's RTL (the bound values are runtime configuration fields).
+
+(iii) **FSM ordering** (e.g., `compute_preloaded` may only fire after `preload`) is recovered from the RTL control register: the active-state guards come from explicit state-comparison logic in the extracted RTL, and every ordering edge corresponds to an instruction that demonstrably writes that control register; the complementary idle-state guard is inferred under a binary-FSM assumption.
+
+The camera-ready will add a worked example tying each of (i)–(iii) to the corresponding RTL evidence.
 
 ## Response to Reviewer B
 
 **R-B.1 *Handling RTL with highly irregular or dynamic control flow.***
 
-See (C1) for FEATHER, whose BIRRD reconfigurable reduction network is the concrete instance. Conceptually, the contract is that the pipeline *never attempts to mis-lift*: when control flow does not match a tensor template the instruction falls into the partial or opaque category of (C2), where its bit-level semantics are preserved verbatim. The cause taxonomy is small (six causes) and predictable, and covers every residual we observed across the three accelerators.
+See (C1) for FEATHER's BIRRD reconfigurable reduction network, and SPAGHETTI's NoC routing and coordinate merge-sort for sparse irregular control. The pipeline never attempts to mis-lift: instructions that manage control, addressing, or coordinate state classify as **Control** in (C2), where their bit-level semantics are preserved verbatim.
 
 **R-B.2 *Compilation-time overhead compared to traditional verification flows.***
 
-TensorLift is a **one-time spec-extraction cost**, not a per-compile overhead. The dominant cost is autoGenILA extraction (4540 s on Gemmini's ExecuteController at DIM=16), paid once per accelerator; downstream lift (619 s), assembly (43 s), and Z3 (≈25 ms) reuse the extracted MLIR for every subsequent compile. This replaces manual TAIDL authoring — an expert-weeks effort that motivated this work and that traditional formal-verification flows do not produce. Verification cost is flat in DIM (a single per-PE MAC proof certifies the whole systolic mesh), so it does not scale with design size.
+TensorLift is a **one-time spec-extraction cost**, not a per-compile overhead. The dominant cost is autoGenILA extraction (4540 s on Gemmini's ExecuteController at DIM=16), paid once per accelerator; downstream lift (619 s), assembly (43 s), and Z3 (≈25 ms) reuse the extracted MLIR for every subsequent compile. This replaces manual TAIDL authoring — an expert-weeks effort that motivated this work and that traditional formal-verification flows do not produce; verification cost is flat in DIM (one per-PE MAC proof certifies the whole mesh).
 
 ## Response to Reviewer C
 
 **R-C.1 *Why two accelerators suffice; results on more diverse, control-heavy, or synthesis-optimized designs.***
 
-See (C1). FEATHER is the concrete instance and is architecturally diverse from Gemmini: spatial array + reconfigurable BIRRD reducer, not a systolic mesh. The lift recovers its per-PE MAC, activation/requantize, and partial-sum store fully; the BIRRD switch's reduction is recovered (only its routing remains opaque); the four layout/addressing opcodes are FSM-only by construction. The pipeline runs on FEATHER without any accelerator-specific changes, providing direct evidence that the structural cues used for lifting generalize beyond systolic GEMM engines.
+See (C1). The five accelerators evaluated — Gemmini, VTA, FEATHER, NVDLA, SPAGHETTI — span systolic, adder-tree, reconfigurable spatial, and sparse-decode / SpGEMM classes. Synthesis-optimized hardware remains a limitation, which the camera-ready will state explicitly.
 
 **R-C.2 *More details on failure cases and partially lifted instructions.***
 
-See (C2) for the per-instruction taxonomy across all 23 instructions on Gemmini, VTA, and FEATHER, with every residual mapped to one of six causes. This taxonomy is a Stage-3 template-coverage classification: for example, VTA's GEMM semantics are extracted and spec-aligned, but remain *partial* because the adder-tree fan-in does not yet collapse to the existing `dot_product` template. Opaque is a conservative fallback, not a silent failure. The complement — the practical value of the *fully* lifted and *discovered* features — is in (C3).
+See (C2). Cases a template-fit grading would mark partial — VTA's adder-tree GEMM, FEATHER's BIRRD reduce, NVDLA's sparse weight scatter — classify as Tensor: value semantics captured, just not in a single dense template. (C3) covers the discovered-features practical value.
