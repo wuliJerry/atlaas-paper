@@ -10,18 +10,18 @@ We applied the unmodified pipeline to three more accelerators of different class
 
 **C2: *Per-instruction coverage of captured semantics.***
 
-Reviewer C asks about *partially lifted instructions* and Reviewer A about instructions that *fall back to opaque*. End-to-end compilation needs each instruction's semantics *captured*, not folded to a fixed dense-tensor template. We report each instruction's role: **Tensor** (the instruction produces or moves numeric tensor element values — MAC, dot, reduce, activation/requantize, or DMA of value arrays); **Control** (the instruction manages config / addressing / coordinate / sequencing state, no numeric value output); and **Failed** (the pipeline could not capture the instruction). Across 38 instructions on five accelerators (Gemmini, VTA, FEATHER (C1), NVDLA, SPAGHETTI):
+Our paper introduced *opaque* as the Stage-3 fallback for instructions that do not match a tensor template, and Reviewer C asks about *partially lifted instructions* in the same vein. This template-fit framing conflates two distinct cases: an instruction with no tensor semantics versus one whose tensor semantics are present but match no single dense template. We separate them: every instruction is captured (Failed = 0 for all five accelerators), and we report each captured instruction's role — **Tensor** (produces or moves numeric tensor values, e.g. MAC, dot, reduce, DMA of value arrays) or **Control** (manages config / addressing / coordinate / sequencing state, no numeric output). Across 38 instructions on five accelerators (Gemmini, VTA, FEATHER (C1), NVDLA, SPAGHETTI):
 
 | Accelerator | Tensor | Control | Failed | Instructions |
 |---|:---:|:---:|:---:|:---:|
 | Gemmini   | 7 | 4 | 0 | 11 |
 | VTA       | 3 | 1 | 0 | 4  |
 | FEATHER   | 4 | 4 | 0 | 8  |
-| NVDLA     | 1 | 1 | 0 | 2  |
+| NVDLA (`WL_dec`) | 1 | 1 | 0 | 2  |
 | SPAGHETTI | 6 | 7 | 0 | 13 |
 | **Total** | **21** | **17** | **0** | **38** |
 
-**Failed = 0 across every accelerator.** The Tensor / Control split reflects each instruction's *role*, not a capture failure. Cases a template-fit grading would mark partial — VTA's adder-tree GEMM, FEATHER's BIRRD reduce, NVDLA's popcount-indexed weight scatter — all classify as **Tensor**: they carry value semantics, just not as a single dense template. We also acknowledge Reviewer A's Weakness 2: the headline 92.9% reduction is per-PE, and the overall 26.2% (Gemmini) / 41.2% (VTA) figures already in the paper reflect the control-heavy reality. The camera-ready will lead with the overall numbers and present 92.9% as a per-module compute-core result rather than the headline.
+Cases a template-fit grading would mark partial — VTA's adder-tree GEMM, FEATHER's BIRRD reduce, NVDLA's popcount-indexed weight scatter — all classify as **Tensor**: they carry value semantics, just not as a single dense template. We thank Reviewers A and C for raising these questions, which prompted us to rethink the framing; the camera-ready will adopt the role taxonomy throughout. We also acknowledge Reviewer A's Weakness 2: the headline 92.9% reduction is per-PE, and the overall 24.8% (Gemmini) / 41.2% (VTA) figures already in the paper reflect the control-heavy reality. The camera-ready will lead with the overall numbers and present 92.9% as a per-module compute-core result rather than the headline.
 
 **C3: *Performance framing — the role of discovered features.***
 
@@ -64,7 +64,7 @@ Stage-3 assembly is not independently SMT-proven end-to-end; the formal proofs e
 
 (iii) **FSM ordering** (e.g., `compute_preloaded` may only fire after `preload`) is recovered from the RTL control register: the active-state guards come from explicit state-comparison logic in the extracted RTL, and every ordering edge corresponds to an instruction that demonstrably writes that control register; the complementary idle-state guard is inferred under a binary-FSM assumption.
 
-The camera-ready will add a worked example tying each of (i)–(iii) to the corresponding RTL evidence.
+We also acknowledge that the paper's abstract states correctness is validated through Z3 SMT throughout, which overclaims relative to the scope above; the camera-ready abstract will align with the Z3 + Spike golden-data split. The camera-ready will also add a worked example tying each of (i)–(iii) to the corresponding RTL evidence.
 
 ## Response to Reviewer B
 
