@@ -16,7 +16,7 @@
 %% When submitting camera ready or to TAPS, please change the command
 %% to \documentclass[sigconf]{acmart}.
 %%
-\documentclass[sigconf,authordraft, anonymous]{acmart}
+\documentclass[sigconf]{acmart}
 
 \AtBeginDocument{%
   \providecommand\BibTeX{{Bib\TeX}}}
@@ -51,6 +51,10 @@
 \usepackage{multirow}
 \usepackage{svg}
 \usepackage{placeins}
+% Avoid stranding a subsection heading when its top-aligned figure moves to
+% the next page. The paper has a single FloatBarrier, immediately after that
+% figure, so normal float ordering is sufficient here.
+\renewcommand{\FloatBarrier}{}
 \usepackage{listings}
 \usepackage{xcolor}
 
@@ -173,12 +177,6 @@ We evaluate TensorLift on Gemmini, a systolic-array accelerator, extracting all 
 \input{sections/evaluation}
 \input{sections/related}
 \input{sections/conclusion}
-
-\begin{acks}
-% TODO: Add acknowledgments
-\end{acks}
-
-\clearpage
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{references}
